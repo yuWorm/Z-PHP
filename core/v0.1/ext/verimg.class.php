@@ -139,7 +139,7 @@ class verimg
         $str = '';
         $code = "3456789abcdefghijkmnpqrstuvwxyABCDEFGHIJKMNPQRSTUVWXY";
         for ($i = 0; $i < $this->codeNum; ++$i) {
-            $char = $code{mt_rand(0, strlen($code) - 1)};
+            $char = $code[mt_rand(0, strlen($code) - 1)];
             $str .= $char;
         }
         return $str;
@@ -173,7 +173,7 @@ class verimg
             $ii = mt_rand(-30, 30);
             $x = $i ? floor($this->width / $this->codeNum) * $i + mt_rand(-3, 5) : 5;
             $y = mt_rand(($this->fontSize + 5), ($this->height - 5));
-            imagettftext($this->image, $this->fontSize, $ii, $x, $y, $fontcolor, $this->ttf, $this->vercode{$i});
+            imagettftext($this->image, $this->fontSize, $ii, $x, $y, $fontcolor, $this->ttf, $this->vercode[$i]);
         }
     }
 
