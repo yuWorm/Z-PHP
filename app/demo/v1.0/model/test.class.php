@@ -69,7 +69,7 @@ class test extends model
         $db = $this->db();
         $p = intval($_GET['p'] ?? 0) ?: 1;
         $num = intval($_GET['num'] ?? 0) ?: 10;
-        $page = ['num' => $num, 'p' => $p, 'return' => ['prev', 'next', 'first', 'next', 'list']];
+        $page = ['num' => $num, 'p' => $p, 'return' => ['prev', 'next', 'first', 'last', 'list']];
         $result['data'] = $db->table('user')->page($page)->select();
         $result['page'] = $db->getPage();
         return $result;
