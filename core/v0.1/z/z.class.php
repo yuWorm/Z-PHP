@@ -5,9 +5,10 @@ class z
 {
     final public static function start()
     {
-        self::input();
-        self::mapping();
-        self::session();
+        self::loadMapping();
+        self::loadFunctions();
+        self::setSession();
+        self::setInput();
         headers_sent() || header('Content-type: text/html; charset=utf-8');
         isset($GLOBALS['ZPHP_CONFIG']['POWEREDBY']) && header("X-Powered-By: {$GLOBALS['ZPHP_CONFIG']['POWEREDBY']}");
         $ctrl = '\\ctrl\\' . ROUTE['ctrl'];
@@ -19,7 +20,7 @@ class z
         isset($result) ? die($ctrl::json($result)) : debug::ShowMsg();
         die;
     }
-    private static function session()
+    private static function setSession()
     {
         if (isset($GLOBALS['ZPHP_CONFIG']['SESSION']['auto']) && !$GLOBALS['ZPHP_CONFIG']['SESSION']['auto']) {
             return;
@@ -80,6 +81,15 @@ class z
             is_file($file = P_COMMON . 'config.php') && is_array($conf = require $file) && $GLOBALS['ZPHP_CONFIG'] += $conf;
         }
     }
+    public static function loadFunctions()
+    {
+        is_file($file = P_COMMON . 'functions.php') && require $file;
+        is_file($file = P_APP . 'functions.php') && require $file;
+        if (defined('P_MODULE')) {
+            is_file($file = P_APP_VER . 'functions.php') && require $file;
+            is_file($file = P_MODULE . 'common/functions.php') && require $file;
+        }
+    }
     public static function SetConfig(string $key, $value)
     {
         is_array($value) ? $GLOBALS['ZPHP_CONFIG'][$key] = $value + $GLOBALS['ZPHP_CONFIG'][$key] : $GLOBALS['ZPHP_CONFIG'][$key] = $value;
@@ -88,7 +98,7 @@ class z
     {
         return $key ? $GLOBALS['ZPHP_CONFIG'][$key] : $GLOBALS['ZPHP_CONFIG'];
     }
-    private static function mapping()
+    private static function loadMapping()
     {
         is_file($file = P_APP_VER . 'common/mapping.php') && is_array($map = require $file) && $GLOBALS['ZPHP_MAPPING'] += $map;
         is_file($file = P_COMMON . 'mapping.php') && is_array($map = require $file) && $GLOBALS['ZPHP_MAPPING'] += $map;
@@ -102,7 +112,7 @@ class z
             'base' => "{$path}base/",
         ];
     }
-    private static function input()
+    private static function setInput()
     {
         $I['INPUT'] = file_get_contents('php://input');
         if (isset($_SERVER['CONTENT_TYPE'])) {
@@ -140,7 +150,6 @@ class router
         z::LoadConfig(P_APP_VER . 'config.php');
         self::$IS_MODULE = !empty($GLOBALS['ZPHP_CONFIG']['MODULE']);
         self::$IS_MODULE || z::LoadConfig(P_APP_VER . 'common/config.php');
-        is_file($file = P_APP_VER . 'functions.php') && require $file;
         self::$MOD = $GLOBALS['ZPHP_CONFIG']['URL_MOD'] ?? 'auto';
         $php = explode('/', trim($_SERVER['SCRIPT_NAME'], '/'));
         define('PHP_FILE', array_pop($php));
@@ -208,8 +217,6 @@ class router
             define('P_VIEW_', P_VIEW_MODULE);
             define('P_THEME_MODULE', P_VIEW_MODULE . THEME . '/');
             define('P_THEME_', P_THEME_MODULE);
-
-            is_file($file = P_MODULE . 'common/functions.php') && require $file;
             if (is_file($file = P_MODULE . 'common/config.php') && $conf = require ($file)) {
                 foreach ($conf as $k => $v) {
                     SetConfig($k, $v);
