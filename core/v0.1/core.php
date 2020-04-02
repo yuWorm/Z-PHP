@@ -34,14 +34,10 @@ function AppRun($entry)
         'libs' => P_ROOT . 'libs/',
         'common' => P_COMMON,
     ];
-
-    is_file($file = P_COMMON . 'functions.php') && require $file;
-    is_file($file = P_APP . 'functions.php') && require $file;
     require P_CORE . 'z/z.class.php';
     set_exception_handler('\z\debug::exceptionHandler');
     spl_autoload_register('\z\z::AutoLoad');
     router::init();
-    is_file($file = P_APP_VER . 'common/functions.php') && require $file;
     if ($GLOBALS['ZPHP_CONFIG']['DEBUG'] ?? $GLOBALS['ZPHP_CONFIG']['DEBUG'] = 1) {
         ini_set('display_errors', 'On');
         set_error_handler('\z\debug::errorHandler');
