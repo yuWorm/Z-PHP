@@ -62,15 +62,15 @@ class db
     }
     public function Add($data, $ignore = false)
     {
-        return $this->insert($data, $ignore);
+        return $this->Insert($data, $ignore);
     }
     public function IfInsert($insert, $update = null)
     {
-        return $this->ifUpdate($insert, $update);
+        return $this->IfUpdate($insert, $update);
     }
     public function Save($data)
     {
-        return $this->update($data);
+        return $this->Update($data);
     }
     public function GetError($sp = ';')
     {
@@ -296,7 +296,6 @@ class db
                 if ($act = $this->DB_BASE[$table]['call'][$name] ?? false) {
                     $this->DB_CALL[] = [$act, $params];
                 }
-
             }
         } else {
             foreach ($this->DB_TABLES as $table => $a) {
@@ -353,7 +352,7 @@ class db
                 $result = 0;
                 break;
         }
-        $result && $this->DB_call('ifUpdate', ['result' => $result, 'insert' => $insert, 'update' => $update, 'sql' => $sql, 'bind' => $this->DB_BIND]);
+        $result && $this->DB_call('ifupdate', ['result' => $result, 'insert' => $insert, 'update' => $update, 'sql' => $sql, 'bind' => $this->DB_BIND]);
         $this->DB_done();
         return $result;
     }
@@ -404,7 +403,6 @@ class db
                     if (isset($val)) {
                         break;
                     }
-
                 } elseif (preg_match($preg, $w[0], $match)) {
                     if (isset($match[1])) {
                         if (strpos($match[1], ',')) {
@@ -837,10 +835,7 @@ class db
                     $this->DB_TABLES[$match[2]] = $match[4];
                     return "{$match[1]}`{$this->DB_PREFIX}{$match[2]}` {$match[4]}{$match[5]}";
                 }, $join);
-                if (!$sql || $sql == $join) {
-                    throw new \PDOException("join语句错误:{$join}");
-                }
-                $SQL[] = $sql;
+                $SQL[] = $sql ?: $join;
             }
             $this->DB_JOIND = ' ' . implode(' ', $SQL);
         }
