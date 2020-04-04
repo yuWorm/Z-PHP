@@ -450,13 +450,13 @@ class router
         if (empty($args['params'])) {
             if ('index' !== $info['a']) {
                 $url .= "{$m}/{$info['c']}/{$info['a']}";
-            } elseif ('index' !== $c) {
-                $url .= "{$m}/{$c}";
+            } elseif ('index' !== $info['c']) {
+                $url .= "{$m}/{$info['c']}";
             } elseif ($m && '/index' !== $m) {
                 $url .= $m;
             }
         } else {
-            $url .= "{$m}/{$c}/{$a}";
+            $url .= "{$m}/{$info['c']}/{$info['a']}";
             foreach ($args['params'] as $k => $v) {
                 $url .= "/{$k}/{$v}";
             }
@@ -548,7 +548,6 @@ class router
                 break;
             default:
                 throw new \Exception('url参数4错误');
-                break;
         }
         return $url;
     }
