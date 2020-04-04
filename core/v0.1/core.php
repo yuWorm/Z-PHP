@@ -8,7 +8,7 @@ function AppRun($entry)
     ini_set('date.timezone', 'Asia/Shanghai');
     define('TIME', $_SERVER['REQUEST_TIME']);
     define('MTIME', microtime(true));
-    define('ZPHP_VER', '4.0.0 beta');
+    define('ZPHP_VER', '4.0.0');
     define('IS_AJAX', isset($_SERVER['HTTP_X_REQUESTED_WITH']) && 'xmlhttprequest' === strtolower($_SERVER['HTTP_X_REQUESTED_WITH']));
     define('IS_WX', false !== strpos($_SERVER['HTTP_USER_AGENT'], 'MicroMessenger'));
     define('METHOD', $_SERVER['REQUEST_METHOD']);
