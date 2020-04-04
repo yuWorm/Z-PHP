@@ -286,7 +286,6 @@ class pdo
                 default:
                     debug::ErrorHandler(1120, "{$this->Z_SQL}; ", trim(json_encode($bind, 320), '{}'), 'error');
                     throw $e;
-                    break;
             }
         }
     }
