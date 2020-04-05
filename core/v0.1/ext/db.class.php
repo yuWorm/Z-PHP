@@ -457,25 +457,26 @@ class db
         $ver = $this->DB_PAGE['ver'] ?? '';
         $mod = $this->DB_PAGE['mod'] ?? null;
         $nourl = $this->DB_PAGE['nourl'] ?? 'javascript:;';
-        $params = $_GET;
+        $params = ROUTE['params'];
+        $query = $_GET;
         if (is_array($this->DB_PAGE['return'])) {
             foreach ($this->DB_PAGE['return'] as $v) {
                 switch ($v) {
                     case 'prev':
                         $params[$var] = $p - 1;
-                        $this->DB_PAGED['prev'] = 1 < $p ? router::url([ROUTE['ctrl'], ROUTE['act']], $params, $ver, $mod) : $nourl;
+                        $this->DB_PAGED['prev'] = $params[$var] && $p !== $params[$var] ? router::url([ROUTE['ctrl'], ROUTE['act']], ['params' => $params, 'query' => $query], $ver, $mod) : $nourl;
                         break;
                     case 'next':
                         $params[$var] = $p + 1;
-                        $this->DB_PAGED['next'] = $pages > $p ? router::url([ROUTE['ctrl'], ROUTE['act']], $params, $ver, $mod) : $nourl;
+                        $this->DB_PAGED['next'] = $pages > $p ? router::url([ROUTE['ctrl'], ROUTE['act']], ['params' => $params, 'query' => $query], $ver, $mod) : $nourl;
                         break;
                     case 'first':
                         $params[$var] = 1;
-                        $this->DB_PAGED['first'] = 1 === $p || 1 === $pages ? $nourl : router::url([ROUTE['ctrl'], ROUTE['act']], $params, $ver, $mod);
+                        $this->DB_PAGED['first'] = 1 === $p || 1 === $pages ? $nourl : router::url([ROUTE['ctrl'], ROUTE['act']], ['params' => $params, 'query' => $query], $ver, $mod);
                         break;
                     case 'last':
                         $params[$var] = $pages;
-                        $this->DB_PAGED['prev'] = 1 === $pages || $pages === $p ? $nourl : router::url([ROUTE['ctrl'], ROUTE['act']], $params, $ver, $mod);
+                        $this->DB_PAGED['last'] = 1 === $pages || $pages === $p ? $nourl : router::url([ROUTE['ctrl'], ROUTE['act']], ['params' => $params, 'query' => $query], $ver, $mod);
                         break;
                     case 'list':
                         (int) $rolls = $this->DB_PAGE['rolls'] ?? 10;
@@ -491,7 +492,7 @@ class db
                             }
                             for ($i; $i <= $end; $i++) {
                                 $params[$var] = $i;
-                                $this->DB_PAGED['list'][$i] = $p == $i ? 'javascript:;' : router::url([ROUTE['ctrl'], ROUTE['act']], $params, $ver, $mod);
+                                $this->DB_PAGED['list'][$i] = $p == $i ? 'javascript:;' : router::url([ROUTE['ctrl'], ROUTE['act']], ['params' => $params, 'query' => $query], $ver, $mod);
                             }
                         } else {
                             $this->DB_PAGED['list'] = [];

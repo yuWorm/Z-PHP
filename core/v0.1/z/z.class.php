@@ -271,7 +271,7 @@ class router
         if (isset(self::$ROUTER[$key][$m]) && is_array(self::$ROUTER[$key][$m])) {
             $router = $router ? $router + self::$ROUTER[$key][$m] : self::$ROUTER[$key][$m];
         }
-        $router && ($router['PATH'] = empty(self::$ROUTER[$key]['PATH']) ? $m : self::$ROUTER[$key]['PATH'] . "/{$m}");
+        $router && ($router['PATH'] = empty($router['PATH']) ? $m : $router['PATH'] . "/{$m}");
         empty(self::$ROUTER[$key]) ? self::$ROUTER[$key] = [$M => $router] : self::$ROUTER[$key][$M] = $router;
         return $router;
     }
@@ -391,13 +391,13 @@ class router
                     $uf['a'] = $arr[0];
                     break;
                 case 2:
-                    $uf['c'] = $arr[1];
-                    $uf['a'] = $arr[2];
+                    $uf['c'] = $arr[0];
+                    $uf['a'] = $arr[1];
                     break;
                 case 3:
                     $uf['app'] = $arr[0];
-                    $uf['c'] = $arr[2];
-                    $uf['a'] = $arr[3];
+                    $uf['c'] = $arr[1];
+                    $uf['a'] = $arr[2];
                     break;
             }
         }
@@ -423,11 +423,17 @@ class router
         if ('index' === $Q['a']) {
             unset($Q['a']);
         }
+        if ($args) {
+            isset($args['params']) && $Q += $args['params'];
+            isset($args['query']) && $Q += $args['query'];
+            if (!isset($args['params']) && !isset($args['query'])) {
+                $Q += $args;
+            }
 
-        $args && $Q += (isset($args['query']) ? $args['query'] : $args);
+        }
         $ver && $Q['ver'] = $ver;
-        $query = $Q ? '?' . http_build_query($Q) : '';
-        return "{$url}{$query}";
+        $Q && $url .= '?' . http_build_query($Q);
+        return $url;
     }
 
     public static function U1($path, $args, $ver, $rewrite = false)
@@ -462,8 +468,8 @@ class router
             }
         }
         $ver && $args['query']['ver'] = $ver;
-        $query = isset($args['query']) ? '?' . http_build_query($args['query']) : '';
-        return "{$url}{$query}";
+        empty($args['query']) || $url .= '?' . http_build_query($args['query']);
+        return $url;
     }
 
     public static function U2($path, $args, $ver)
@@ -476,7 +482,6 @@ class router
         if (!$data = self::format($app, $m, $ver)) {
             throw new \Exception("没有配置路由，[app：{$app}，ver：{$ver}]");
         }
-
         $url = $data[0] ? U_HOME . $data[0] : U_ROOT;
         if (isset($data[$c][$a])) {
             $route = $data[$c][$a];
@@ -521,8 +526,7 @@ class router
         }
         isset($params) && $url .= '/' . implode('/', $params);
         $ver && $args['query']['ver'] = $ver;
-        $query = isset($args['query']) ? '?' . http_build_query($args['query']) : '';
-        $url .= $query;
+        empty($args['query']) || $url .= '?' . http_build_query($args['query']);
         return $url;
     }
 
