@@ -49,7 +49,7 @@ class test extends model
     public function SelectData()
     {
         $db = $this->db();
-        $limit = intval($_GET['limit'] ?? 0) ?: 10;
+        $limit = intval(ROUTE['query']['limit'] ?? 0) ?: 5;
         $where['uid >'] = 0;
         $result = $db->table('user')->where($where)->limit($limit)->select();
         return $result;
@@ -57,8 +57,8 @@ class test extends model
     public function PageSelect0()
     {
         $db = $this->db();
-        $p = intval($_GET['p'] ?? 0) ?: 1;
-        $num = intval($_GET['num'] ?? 0) ?: 10;
+        $p = intval(ROUTE['query']['p'] ?? 0) ?: 1;
+        $num = intval(ROUTE['query']['num'] ?? 0) ?: 10;
         $page = ['num' => $num, 'p' => $p, 'return' => true];
         $result['data'] = $db->table('user')->page($page)->select();
         $result['page'] = $db->getPage();
@@ -67,9 +67,9 @@ class test extends model
     public function PageSelect1()
     {
         $db = $this->db();
-        $p = intval($_GET['p'] ?? 0) ?: 1;
-        $num = intval($_GET['num'] ?? 0) ?: 10;
-        $page = ['num' => $num, 'p' => $p, 'return' => ['prev', 'next', 'first', 'last', 'list']];
+        $p = intval(ROUTE['query']['p'] ?? 0) ?: 1;
+        $num = intval(ROUTE['query']['num'] ?? 0) ?: 5;
+        $page = ['num' => $num, 'p' => $p, 'var' => 'p', 'return' => ['prev', 'next', 'first', 'last', 'list']];
         $result['data'] = $db->table('user')->page($page)->select();
         $result['page'] = $db->getPage();
         return $result;
@@ -77,8 +77,8 @@ class test extends model
     public function CacheSelect()
     {
         $db = $this->db();
-        $p = intval($_GET['p'] ?? 0) ?: 1;
-        $num = intval($_GET['num'] ?? 0) ?: 10;
+        $p = intval(ROUTE['query']['p'] ?? 0) ?: 1;
+        $num = intval(ROUTE['query']['num'] ?? 0) ?: 10;
         $page = ['num' => $num, 'p' => $p, 'return' => true];
         $result['data'] = $db->table('user')->page($page)->cache(60)->select();
         $result['page'] = $db->getPage();

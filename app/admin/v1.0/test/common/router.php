@@ -1,6 +1,6 @@
 <?php
 return [
-    'PATH' => 'index.php',
+    'PATH' => 'admin',
     '/' => [
         'ctrl' => 'index',
         'act' => 'index1',
@@ -16,6 +16,7 @@ return [
     '/model' => [
         'ctrl' => 'model',
         'act' => '*', //*会替换为 pathinfo 的 action
+        'params' => ['p'],
     ],
     '*' => [ // 以上匹配不到时使用此路由
         'ctrl' => 'index',
