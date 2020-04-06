@@ -23,7 +23,7 @@ function AppRun($entry)
     define('P_CACHE', P_ROOT . 'tmp/cache/');
     define('P_APP', P_ROOT . 'app/' . APP_NAME . '/');
     define('P_COMMON', P_ROOT . 'common/');
-    define('LEN_IN', strlen(P_IN) - 1);
+    define('LEN_IN', strlen(P_IN));
     define('P_PUBLIC', P_IN === P_ROOT ? P_IN . 'public/' : P_IN);
     define('P_RES', P_PUBLIC . 'res/');
 
