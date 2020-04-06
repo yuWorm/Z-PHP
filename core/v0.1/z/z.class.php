@@ -88,6 +88,8 @@ class z
         if (defined('P_MODULE')) {
             is_file($file = P_APP_VER . 'functions.php') && require $file;
             is_file($file = P_MODULE . 'common/functions.php') && require $file;
+        } else {
+            is_file($file = P_APP_VER . 'common/functions.php') && require $file;
         }
     }
     public static function SetConfig(string $key, $value)
