@@ -4,24 +4,50 @@ namespace z;
 class view
 {
     const
-    PREG_SRC = '/(href|src)\s*=[\"\'](.*%.+)[\"\']/',
-
+    ENCODE_PREFIX = 'z-php-encode',
+    ENCODE_END_CHAR = '#',
+    OPTIONS = LIBXML_NOBLANKS + LIBXML_HTML_NOIMPLIED + LIBXML_NOERROR + LIBXML_HTML_NODEFDTD + LIBXML_ERR_FATAL + LIBXML_COMPACT,
     PREG_COMPRESS = ['/<!--(.|\s)*?-->/', '/[\n\r\t]+/', '/>\s+</', '/\s{2,}/'],
     REPLACE_COMPRESS = ['', '', '><', ' '],
-
     PREG_NOTES = '/<!--(.|\s)*?-->/',
-    REPLACE_NOTES = '',
-
-    PREG_BETWEEN_TAGS = '/&lt;\?php\s}\?&gt;&lt;\?php\s}(\w+){\?&gt;/',
-    REPLACE_BETWEEN_TAGS = '<?php }$1{?>',
-
-    SEARCH_HTML_CODES = ['&lt;?php', '?&gt;', '=&gt;', '&lt;?=', '%%#lt#;%%', '%%#gt#;%%'],
-    REPLACE_HTML_CODES = ['<?php', '?>', '=>', '<?=', '<', '>'],
-
-    SEARCH_LTGT = ['<', '>'],
-    REPLACE_LTGT = ['%%#lt#;%%', '%%#gt#;%%'];
+    REPLACE_NOTES = '';
 
     private static $TAG, $PRE, $SUF, $DOMS, $TPL, $FILE, $PARAMS, $RUN, $PREG, $CHANGED, $IMPORTS, $SEARCH_FIX, $REPLACE_FIX;
+    private static function replaceEncode($html)
+    {
+        $i = 0;
+        $pre = preg_quote(self::$PRE);
+        $suf = preg_quote(self::$SUF);
+        $preg0 = "/({$pre}|<\?=)([\s\S]+)({$suf}|\?>)/U";
+        $preg1 = '/<\?php([\s\S]+)\?>/U';
+        $html = preg_replace_callback($preg0, function ($match) use (&$i) {
+            $code = trim($match[2]);
+            $encode = self::ENCODE_PREFIX . "{$i}=" . base64_encode("<?php echo {$code};?>") . self::ENCODE_END_CHAR;
+            ++$i;
+            return $encode;
+        }, $html);
+        $html = preg_replace_callback($preg1, function ($match) use (&$i) {
+            $code = trim($match[1]);
+            $encode = self::ENCODE_PREFIX . "{$i}=" . base64_encode("<?php {$code}?>") . self::ENCODE_END_CHAR;
+            ++$i;
+            return $encode;
+        }, $html);
+        return $html;
+    }
+    private static function replaceDecode($html)
+    {
+        $prefix = preg_quote(self::ENCODE_PREFIX);
+        $endchar = preg_quote(self::ENCODE_END_CHAR);
+        $preg1 = "/{$prefix}\d+\=([\w\/\+\=]+){$endchar}/";
+        $preg0 = "/{$prefix}\d+\=\"([\w\/\+\=]+){$endchar}\"/";
+        $html = preg_replace_callback($preg0, function ($match) {
+            return base64_decode($match[1]);
+        }, $html);
+        $html = preg_replace_callback($preg1, function ($match) {
+            return base64_decode($match[1]);
+        }, $html);
+        return $html;
+    }
     private static function getTplInfo($name)
     {
         $name = trim($name, '/');
@@ -75,10 +101,10 @@ class view
         if (!isset(self::$DOMS[$key])) {
             $time = filemtime($file);
             $time > self::$CHANGED && self::$CHANGED = $time;
-            $html = $html = str_replace(self::$SEARCH_FIX, self::$REPLACE_FIX, file_get_contents($file));
+            $html = self::replaceEncode(file_get_contents($file));
             $html = '<?xml encoding="UTF-8">' . $html;
             $dom = new \DOMDocument('1.0', 'UTF-8');
-            $dom->loadHTML($html, 74023);
+            $dom->loadHTML($html, self::OPTIONS);
             self::$DOMS[$key] = $dom->getElementsByTagName(self::$TAG['template']);
             2 === $GLOBALS['ZPHP_CONFIG']['DEBUG'] && debug::setMsg(1140, $file);
         }
@@ -114,12 +140,10 @@ class view
                 if (!isset(self::$TPL[$key][$name])) {
                     throw new \Exception("template tagName '{$name}' not exits : {$tpl}");
                 }
-
                 foreach (self::$TPL[$key][$name] as $k => $n) {
                     if (1 !== $n->nodeType || self::$TAG['import'] === $n->tagName) {
                         continue;
                     }
-
                     $new = $dom->importNode($n, true);
                     $v->parentNode->insertBefore($new, $v);
                 }
@@ -138,7 +162,7 @@ class view
         $run[1] = explode('.', $name)[0];
         return $run;
     }
-    private static function getCache($time, $name = '')
+    public static function GetCache($time, $name = '')
     {
         $tpl = self::getTpl($name, true);
         $run = self::getRun($tpl);
@@ -150,7 +174,6 @@ class view
         } else {
             return false;
         }
-
     }
 
     public static function Fetch(string $name = '', int $cache = 0)
@@ -171,36 +194,27 @@ class view
             if (!file_exists($run_path) && !mkdir($run_path, 0755, true)) {
                 throw new \Exception("file can not write: {$run_path}");
             }
-
             self::$PRE = $GLOBALS['ZPHP_CONFIG']['VIEW']['prefix'] ?? '<{';
             self::$SUF = $GLOBALS['ZPHP_CONFIG']['VIEW']['suffix'] ?? '}>';
-            self::$SEARCH_FIX = ['<?=', self::$PRE, self::$SUF];
-            self::$REPLACE_FIX = ['&lt;?=', '&lt;?=', '?&gt;'];
             self::$CHANGED = filemtime($tpl);
             $dom = new \DOMDocument('1.0', 'UTF-8');
-            $html = str_replace(self::$SEARCH_FIX, self::$REPLACE_FIX, file_get_contents($tpl));
+            $html = self::replaceEncode(file_get_contents($tpl));
             $html = '<meta http-equiv="Content-Type" content="text/html; charset=utf-8">' . $html;
-            $dom->loadHTML($html, 74023);
+            $dom->loadHTML($html, self::OPTIONS);
             self::replaceTemplate($dom, $tpl);
 
             foreach (self::$IMPORTS as $v) {
                 $v->parentNode->removeChild($v);
             }
-
             if (!$run_time || self::$CHANGED > $run_time) {
                 self::replacePHP($dom);
                 $html = $dom->saveHTML();
-                $html = preg_replace_callback(self::PREG_SRC, function ($matchs) {
-                    $url = urldecode($matchs[2]);
-                    return "{$matchs[1]}=\"{$url}\"";
-                }, $html);
-                $html = preg_replace(self::PREG_BETWEEN_TAGS, self::REPLACE_BETWEEN_TAGS, $html);
-                $html = str_replace(self::SEARCH_HTML_CODES, self::REPLACE_HTML_CODES, $html);
+                $html = self::replaceDecode($html);
+                $html = str_replace('<?php }?><?php }else{?>', '<?php }else{?>', $html);
                 $html = self::format($html);
                 if (!file_put_contents($run_file, $html)) {
                     throw new \Exception("file can not write:{$run_file}");
                 }
-
             }
         }
         self::$PARAMS && extract(self::$PARAMS);
@@ -214,13 +228,11 @@ class view
             if (!file_exists($html_path) && !mkdir($html_path, 0755, true)) {
                 throw new \Exception("file can not write: {$html_path}");
             }
-
             $html_time = is_file($html_file) ? filemtime($html_file) : 0;
             if (!$html_time || $html_time + $cache < TIME) {
                 if (!file_put_contents($html_file, $html)) {
                     throw new \Exception("file can not write:{$html_file}");
                 }
-
             }
         }
         return $html;
@@ -234,8 +246,9 @@ class view
             $parent = $t->parentNode;
             if ($t->attributes->length) {
                 $code = '';
-                $attr = [];
                 $d = [];
+                $lastNode = null;
+                $lastName = '';
                 for ($n = 0, $len = $t->attributes->length; $n !== $len; ++$n) {
                     $a = $t->attributes[$n];
                     switch ($a->name) {
@@ -249,17 +262,18 @@ class view
                                 }
                             }
                             $code .= 'default' === $a->value ? '<?php default:?>' : "<?php case {$a->value}:?>";
-                            $d[] = $break ? '<?php break;?>' : '';
+                            $dd = $break ? '<?php break;?>' : '';
                             break;
                         case 'else':
                             $code .= '<?php }else{?>';
-                            $d[] = '<?php }?>';
+                            $dd = '<?php }?>';
                             break;
                         default:
-                            $value = str_replace(self::SEARCH_LTGT, self::REPLACE_LTGT, $a->value);
-                            $code .= "<?php {$a->name}({$value}){?>";
-                            $d[] = '<?php }?>';
+                            $code .= "<?php {$a->name}({$a->value}){?>";
+                            $dd = '<?php }?>';
                     }
+                    $code = self::ENCODE_PREFIX . "{$n}=" . base64_encode($code) . self::ENCODE_END_CHAR;
+                    $d[] = self::ENCODE_PREFIX . "{$n}=" . base64_encode($dd) . self::ENCODE_END_CHAR;
                 }
                 $new = $dom->createTextNode($code);
                 $parent->insertBefore($new, $t);
@@ -273,7 +287,7 @@ class view
                 }
                 $parent->removeChild($t);
             } else {
-                $code = "<?php {$t->nodeValue};?>";
+                $code = self::ENCODE_PREFIX . '0=' . base64_encode("<?php {$t->nodeValue};?>") . self::ENCODE_END_CHAR;
                 $new = $dom->createTextNode($code);
                 $parent->replaceChild($new, $t);
             }
