@@ -101,7 +101,7 @@ class db
         $this->DB_CALL = null;
         return $result;
     }
-    public function Tmp($sql, $alias)
+    public function Tmp($sql, $alias = 'z')
     {
         $this->DB_TMP = "({$sql}) AS {$alias}";
         return $this;
@@ -177,24 +177,23 @@ class db
         $this->DB_MERGE = null;
         return $sql;
     }
-    public function Merge($type = '')
+    public function Merge($sql, $type = null)
     {
-        //type='ALL'不去除重复
-        $type && $type .= ' ';
-        $sql = $this->DB_sql();
-        $field = $this->DB_field();
-        $sql = "SELECT {$field} FROM " . $sql;
-        $this->DB_WHERE = null;
-        $this->DB_WHERED = null;
-        $this->DB_JOIN = [];
-        $this->DB_JOIND = null;
-        $this->DB_JOINMAP = null;
-        $this->DB_GROUP = null;
-        $this->DB_ORDER = null;
-        $this->DB_LIMIT = null;
-        $this->DB_HAVING = null;
-        $this->DB_SQLD = null;
-        $this->DB_MERGE[] = " UNION {$type}{$sql}";
+        // type='ALL'不去除重复
+        if (is_array($sql)) {
+            if (is_array($type)) {
+                foreach ($sql as $k => $v) {
+                    $t = empty($type[$k]) ? ' UNION ' : " UNION {$type[$k]} ";
+                    $this->DB_MERGE .= $t . $v;
+                }
+            } else {
+                $t = $type ? " UNION {$type} " : ' UNION ';
+                $this->DB_MERGE = $t . implode($t, $sql);
+            }
+        } else {
+            $type && $type .= ' ';
+            $this->DB_MERGE = $type . $sql;
+        }
         return $this;
     }
     public function Fetch($lock = false)
@@ -820,7 +819,7 @@ class db
             $limit = !$count && $this->DB_LIMIT ? " LIMIT {$this->DB_LIMIT}" : '';
             $order = !$count && $this->DB_ORDER ? " ORDER BY {$this->DB_ORDER}" : '';
             $this->DB_SQLD = $table . $join . $where . $group . $having . $order . $limit;
-            $this->DB_MERGE && $this->DB_SQLD .= implode('', $this->DB_MERGE);
+            $this->DB_MERGE && $this->DB_SQLD .= $this->DB_MERGE;
         }
         return $this->DB_SQLD;
     }
