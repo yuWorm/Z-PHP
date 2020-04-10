@@ -49,7 +49,7 @@ class test extends model
     public function SelectData()
     {
         $db = $this->db();
-        $limit = intval(ROUTE['query']['limit'] ?? 0) ?: 5;
+        $limit = intval(ROUTE['query']['limit'] ?? 0) ?: 10;
         $where['uid >'] = 0;
         $result = $db->table('user')->where($where)->limit($limit)->select();
         return $result;
@@ -68,7 +68,7 @@ class test extends model
     {
         $db = $this->db();
         $p = intval(ROUTE['query']['p'] ?? 0) ?: 1;
-        $num = intval(ROUTE['query']['num'] ?? 0) ?: 5;
+        $num = intval(ROUTE['query']['num'] ?? 0) ?: 10;
         $page = ['num' => $num, 'p' => $p, 'var' => 'p', 'return' => ['prev', 'next', 'first', 'last', 'list']];
         $result['data'] = $db->table('user')->page($page)->select();
         $result['page'] = $db->getPage();
