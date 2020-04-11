@@ -456,7 +456,7 @@ class db
         $ver = $this->DB_PAGE['ver'] ?? '';
         $mod = $this->DB_PAGE['mod'] ?? null;
         $nourl = $this->DB_PAGE['nourl'] ?? 'javascript:;';
-        $params = ROUTE['params'];
+        $params = ROUTE['params'] ?? false;
         $query = $_GET;
         if (is_array($this->DB_PAGE['return'])) {
             foreach ($this->DB_PAGE['return'] as $v) {
