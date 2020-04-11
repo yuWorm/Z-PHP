@@ -143,7 +143,9 @@ class router
     $STATE = 0,
     $VER = [],
     $ROUTER = [],
-    $FORMAT = []
+    $FORMAT = [],
+    $APP_ISMODULE,
+    $APP_MAP
     ;
     public static function init()
     {
@@ -273,7 +275,6 @@ class router
         if (isset(self::$ROUTER[$key][$m]) && is_array(self::$ROUTER[$key][$m])) {
             $router = $router ? $router + self::$ROUTER[$key][$m] : self::$ROUTER[$key][$m];
         }
-        $router && ($router['PATH'] = empty($router['PATH']) ? $m : $router['PATH'] . "/{$m}");
         empty(self::$ROUTER[$key]) ? self::$ROUTER[$key] = [$M => $router] : self::$ROUTER[$key][$M] = $router;
         return $router;
     }
@@ -284,9 +285,37 @@ class router
         }
 
         $path = P_ROOT . "app/{$name}/";
-        $conf = is_file($file = "{$path}config.php") ? require $file : false;
-        self::$VER[$name] = isset($conf['VER'][1]) && $conf['VER'][1] ? $conf['VER'][1] : $conf['VER'][0] ?? '';
+        if ($conf = is_file($file = "{$path}config.php") ? require $file : false) {
+            self::$VER[$name] = isset($conf['VER'][1]) && $conf['VER'][1] ? $conf['VER'][1] : $conf['VER'][0] ?? null;
+        }
+        self::$VER[$name] ?? self::$VER[$name] = VER;
         return self::$VER[$name];
+    }
+    private static function getIsmodule (string $app, string $ver) {
+        if($app === APP_NAME) return self::$IS_MODULE;
+        $ver || $ver = self::getVer($app);
+        if(!isset(self::$APP_ISMODULE[$app])){
+            if(is_file($file = P_ROOT . "app/{$app}/v{$ver}/config.php") && $config = require $file){
+                $ismodule = $config['MODULE'] ?? null;
+            }
+            if(!isset($ismodule) && is_file($file = P_ROOT . "app/{$app}/config.php") && $config = require $file) {
+                $ismodule = $config['MODULE'] ?? null;
+            }
+            if(!isset($ismodule) && is_file($file = P_ROOT . 'common/config.php') && $config = require $file) {
+                $ismodule = $config['MODULE'] ?? false;
+            }
+            self::$APP_ISMODULE[$app] = $ismodule;
+        }
+        return self::$APP_ISMODULE[$app];
+    }
+    private static function getAppName (string $php) {
+        if(isset(self::$APP_MAP[$php])) return self::$APP_MAP[$php];
+        if(is_file($file = P_IN . $php) && $str = file_get_contents($file)){
+            $preg = '/define.+\,\s*\'(\w+)\'\s*\)/';
+            preg_match($preg, $str, $match);
+            self::$APP_MAP[$php] = $match[1] ?? false;
+        }
+        return self::$APP_MAP[$php];
     }
     public static function setVer()
     {
@@ -352,72 +381,87 @@ class router
         self::$FORMAT[$key] = $data;
         return $data;
     }
-    private static function getUf($path)
+    private static function getUf($path, $ver)
     {
         if (!$path || '/' === $path) {
-            $uf['p'] = $_SERVER['SCRIPT_NAME'];
             self::$IS_MODULE && $uf['m'] = ROUTE['module'];
             $uf['c'] = ROUTE['ctrl'];
             $uf['a'] = 'index';
             return $uf;
         }
         $arr = is_array($path) ? $path : explode('/', $path);
-        if (self::$IS_MODULE) {
+        if('.php' === substr($arr[0], -4)){
+            $uf['app'][0] = $arr[0];
+            $uf['app'][1] = self::getAppName($uf['app'][0]);
+            if($ismodule = self::getIsmodule($uf['app'][1], $ver)){
+                if(4 !== count($arr)) throw new \Exception('RUL(参数错误)，格式："入口文件名/模块名/控制器/操作"');
+                $uf['m'] = $arr[1];
+                $uf['c'] = $arr[2];
+                $uf['a'] = $arr[3];
+            }else{
+                if(3 !== count($arr)) throw new \Exception('URL(参数错误)，格式："入口文件名/控制器/操作"');
+                $uf['c'] = $arr[1];
+                $uf['a'] = $arr[2];
+            }
+        }elseif(self::$IS_MODULE){
             switch (count($arr)) {
                 case 1:
                     $uf['m'] = ROUTE['module'];
                     $uf['c'] = ROUTE['ctrl'];
                     $uf['a'] = $arr[0];
-                    break;
+                break;
                 case 2:
                     $uf['m'] = ROUTE['module'];
                     $uf['c'] = $arr[0];
                     $uf['a'] = $arr[1];
-                    break;
+                break;
                 case 3:
                     $uf['m'] = $arr[0];
                     $uf['c'] = $arr[1];
                     $uf['a'] = $arr[2];
-                    break;
-                case 4:
-                    $uf['app'] = $arr[0];
-                    $uf['m'] = $arr[1];
-                    $uf['c'] = $arr[2];
-                    $uf['a'] = $arr[3];
-                    break;
+                break;
             }
         } else {
             switch (count($arr)) {
                 case 1:
                     $uf['c'] = ROUTE['ctrl'];
                     $uf['a'] = $arr[0];
-                    break;
+                break;
                 case 2:
                     $uf['c'] = $arr[0];
                     $uf['a'] = $arr[1];
-                    break;
-                case 3:
-                    $uf['app'] = $arr[0];
-                    $uf['c'] = $arr[1];
-                    $uf['a'] = $arr[2];
-                    break;
+                break;
             }
         }
         return $uf;
     }
-    public static function U0($path, $args, $ver)
-    {
-        $Q = self::getUf($path);
-        if (isset($Q['app'])) {
-            $url = U_HOME . $Q['app'] . '.php';
-            unset($Q['app']);
+    private static function getInPath($info, $ver = '', $param = false){
+        if (isset($info['app'])) {
+            $php = $info['app'][0];
+            $app = $info['app'][1];
         } else {
-            $url = U_HOME . PHP_FILE;
+            $php = PHP_FILE;
+            $app = APP_NAME;
         }
+        $m = $info['m'] ?? ROUTE['module'] ?? false;
+        if($route = self::format($app, $m, $ver)){
+            $url = isset($route[0]) ? U_HOME . $route[0] : U_ROOT;
+        }else{
+            $url = !$param && 'index.php' === $php ? U_ROOT : U_HOME . $php;
+        }
+        return $url;
+    }
+    public static function U0($path, $args, $ver = '')
+    {
+        $Q = self::getUf($path, $ver);
+        $url = self::getInPath($Q, $ver);
+
         if (isset($Q['m']) && 'index' === $Q['m']) {
             unset($Q['m']);
         }
-
+        if (isset($Q['app'])) {
+            unset($Q['app']);
+        }
         if ('index' === $Q['c']) {
             unset($Q['c']);
         }
@@ -426,8 +470,8 @@ class router
             unset($Q['a']);
         }
         if ($args) {
-            isset($args['params']) && $Q += $args['params'];
-            isset($args['query']) && $Q += $args['query'];
+            empty($args['params']) || $Q += $args['params'];
+            empty($args['query']) || $Q += $args['query'];
             if (!isset($args['params']) && !isset($args['query'])) {
                 $Q += $args;
             }
@@ -438,22 +482,10 @@ class router
         return $url;
     }
 
-    public static function U1($path, $args, $ver, $rewrite = false)
+    public static function U1($path, $args, $ver = '')
     {
-        $info = self::getUf($path);
-        $php = isset($info['app']) ? "{$info['app']}.php" : PHP_FILE;
-        if ($rewrite) {
-            $php = substr($php, 0, -4);
-            if (is_array($rewrite)) {
-                if (!isset($rewrite[$php])) {
-                    throw new \Exception('url参数4错误');
-                }
-
-                $php = $rewrite[$php];
-            }
-            $php = 'index' === $php ? '' : $php;
-        }
-        $url = $php ? U_HOME . $php : U_ROOT;
+        $info = self::getUf($path, $ver);
+        $url = self::getInPath($info, $ver, !empty($args['params']));
         $m = isset($info['m']) ? "/{$info['m']}" : '';
         if (empty($args['params'])) {
             if ('index' !== $info['a']) {
@@ -474,17 +506,18 @@ class router
         return $url;
     }
 
-    public static function U2($path, $args, $ver)
+    public static function U2($path, $args, $ver = '')
     {
-        $info = self::getUf($path);
-        $app = $info['app'] ?? APP_NAME;
+        $info = self::getUf($path, $ver);
+        $app = $info['app'][1] ?? APP_NAME;
         $m = $info['m'] ?? '';
         $c = $info['c'];
         $a = $info['a'];
         if (!$data = self::format($app, $m, $ver)) {
             throw new \Exception("没有配置路由，[app：{$app}，ver：{$ver}]");
         }
-        $url = $data[0] ? U_HOME . $data[0] : U_ROOT;
+        $url = $m ? ($data[0] ? "{$data[0]}/{$m}" : $m) : $data[0];
+        $url = $url ? U_HOME . $url : U_ROOT;
         if (isset($data[$c][$a])) {
             $route = $data[$c][$a];
         } elseif (isset($data[$c]['*'])) {
@@ -497,6 +530,8 @@ class router
             }
             $route ?? $route = $data[$c]['*'][''] ?? null;
             $route && $route[0] .= '/' . $a;
+        }else{
+            throw new \Exception("没有匹配到路由，[ctrl：{$c}，act：{$a}]");
         }
         if (isset($route)) {
             $route[0] && $url .= $route[0];
