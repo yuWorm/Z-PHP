@@ -611,14 +611,13 @@ class router
         }
         if (isset($arr[0]) && $route = $router["/{$info['ctrl']}/{$arr[0]}"] ?? false) {
             array_shift($arr);
-        } elseif (!$route = $router["/{$info['ctrl']}/*"] ?? $router["/{$info['ctrl']}"] ?? $router['/'] ?? $router['*'] ?? false) {
+        } elseif (!$route = $router["/{$info['ctrl']}/*"] ?? $router["/{$info['ctrl']}"] ?? $router['*'] ?? false) {
             throw new \Exception('没有匹配到路由, 不想看到此错误请配置 * 路由');
         } elseif (empty($route['ctrl']) || empty($route['act'])) {
             throw new \Exception('必须设置路由的 ctrl 和 act');
-        } elseif (strpos($route['act'], '*') && $replace = array_shift($arr)) {
+        } elseif (false !== strpos($route['act'], '*') && $replace = array_shift($arr) ?: 'index') {
             $route['act'] = str_replace('*', $replace, $route['act']);
         }
-
         isset($info['module']) && $route['module'] = $info['module'];
         if (isset($route['params'])) {
             $ii = 0;
