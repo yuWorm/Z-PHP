@@ -496,8 +496,10 @@ class router
                 }
             }
             $route ?? $route = $data[$c]['*'][''] ?? null;
+            $route && $route[0] .= '/' . $a;
         }
         if (isset($route)) {
+            $route[0] && $url .= $route[0];
             if (isset($args['params']) && $route[1]) {
                 $i = 0;
                 foreach ($route[1] as $k => $v) {
@@ -521,11 +523,7 @@ class router
                 $params[] = $v;
             }
         }
-        if (isset($params) || 'index' !== $a) {
-            $url .= "/{$c}/{$a}";
-        } elseif ('index' !== $c) {
-            $url .= "/{$c}";
-        }
+
         isset($params) && $url .= '/' . implode('/', $params);
         $ver && $args['query']['ver'] = $ver;
         empty($args['query']) || $url .= '?' . http_build_query($args['query']);
@@ -588,12 +586,12 @@ class router
 
         self::$IS_MODULE && $info['module'] = array_shift($params);
         $info['ctrl'] = $params ? array_shift($params) : 'index';
-        $info['act'] = $params ? array_shift($params) : $act ?? 'index';
         return [$info, $params];
     }
     private static function pathinfoRoute($pathinfo)
     {
         list($route, $params) = self::pathinfo2arr($pathinfo);
+        $route['act'] = $params ? array_shift($params) : $act ?? 'index';
         $route['path'] = $params;
         $route['params'] = [];
         if ($params) {
@@ -611,13 +609,16 @@ class router
         if (isset($info['module']) && !$router = self::getModuleRouter($info['module'])) {
             throw new \Exception("没有{$info['module']}模块的路由");
         }
-        $route = $router["/{$info['ctrl']}/{$info['act']}"] ?? $router["/{$info['ctrl']}/*"] ?? $router["/{$info['ctrl']}"] ?? $router['/'] ?? $router['*'] ?? [];
-        if (isset($route['act'])) {
-            false !== strpos($route['act'], '*') && $route['act'] = str_replace('*', $info['act'], $route['act']);
-        } else {
-            $route['act'] = $info['act'];
+        if (isset($arr[0]) && $route = $router["/{$info['ctrl']}/{$arr[0]}"] ?? false) {
+            array_shift($arr);
+        } elseif (!$route = $router["/{$info['ctrl']}/*"] ?? $router["/{$info['ctrl']}"] ?? $router['/'] ?? $router['*'] ?? false) {
+            throw new \Exception('没有匹配到路由, 不想看到此错误请配置 * 路由');
+        } elseif (empty($route['ctrl']) || empty($route['act'])) {
+            throw new \Exception('必须设置路由的 ctrl 和 act');
+        } elseif (strpos($route['act'], '*') && $replace = array_shift($arr)) {
+            $route['act'] = str_replace('*', $replace, $route['act']);
         }
-        isset($route['ctrl']) || $route['ctrl'] = $info['ctrl'];
+
         isset($info['module']) && $route['module'] = $info['module'];
         if (isset($route['params'])) {
             $ii = 0;
