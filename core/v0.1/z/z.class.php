@@ -10,7 +10,7 @@ class z
         self::setSession();
         self::setInput();
         headers_sent() || header('Content-type: text/html; charset=utf-8');
-        isset($GLOBALS['ZPHP_CONFIG']['POWEREDBY']) && header("X-Powered-By: {$GLOBALS['ZPHP_CONFIG']['POWEREDBY']}");
+        header('X-Powered-By: ' . ($GLOBALS['ZPHP_CONFIG']['POWEREDBY'] ?? 'Z-PHP'));
         $ctrl = '\\ctrl\\' . ROUTE['ctrl'];
         $act = ROUTE['act'];
         $GLOBALS['ZPHP_CONFIG']['DEBUG'] || method_exists($ctrl, $act) || class_exists($ctrl, false) && $ctrl::_404() || ctrl::_404();
