@@ -857,7 +857,7 @@ class debug
     private static function getConfigs()
     {
         foreach ($GLOBALS['ZPHP_CONFIG'] as $k => $v) {
-            $str = json_encode($v, 320);
+            $str = htmlspecialchars(json_encode($v, 320));
             self::$errs[1132][] = "[{$k}] : {$str}";
         }
     }
@@ -868,7 +868,7 @@ class debug
         }
 
         foreach ($params as $k => $v) {
-            $str = json_encode($v, 320);
+            $str = htmlspecialchars(json_encode($v, 320));
             self::$errs[1150][] = "\${$k} : {$str}";
         }
     }
@@ -878,7 +878,7 @@ class debug
             self::$errs[1160] = $_POST;
         } else {
             foreach ($_POST as $k => $v) {
-                $str = json_encode($v, 320);
+                $str = htmlspecialchars(json_encode($v, 320));
                 self::$errs[1160][] = "[{$k}] : {$str}";
             }
         }
@@ -887,14 +887,14 @@ class debug
     {
         $const = get_defined_constants(true)['user'];
         foreach ($const as $k => $v) {
-            $str = json_encode($v, 320);
+            $str = htmlspecialchars(json_encode($v, 320));
             self::$errs[1131][] = "[{$k}] : {$str}";
         }
     }
     private static function getServer()
     {
         foreach ($_SERVER as $k => $v) {
-            $str = json_encode($v, 320);
+            $str = htmlspecialchars(json_encode($v, 320));
             self::$errs[1130][] = "[{$k}] : {$str}";
         }
     }
