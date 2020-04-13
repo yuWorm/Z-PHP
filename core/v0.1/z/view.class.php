@@ -199,8 +199,10 @@ class view
             self::$CHANGED = filemtime($tpl);
             $dom = new \DOMDocument('1.0', 'UTF-8');
             $html = self::replaceEncode(file_get_contents($tpl));
-            $html = '<meta http-equiv="Content-Type" content="text/html; charset=utf-8">' . $html;
+            $html = '<meta id="z-php-def-meta-utf-8" http-equiv="Content-Type" content="text/html; charset=utf-8">' . $html;
             $dom->loadHTML($html, self::OPTIONS);
+            $rm = $dom->getElementById('z-php-def-meta-utf-8');
+            $dom->removeChild($rm);
             self::replaceTemplate($dom, $tpl);
 
             foreach (self::$IMPORTS as $v) {
