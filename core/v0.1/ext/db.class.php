@@ -246,7 +246,7 @@ class db
                 $result = $this->PDO->getCache($ckey);
                 if (0 > $cached || false === $result || !$page = $this->PDO->getCache($pkey)) {
                     $this->DB_page();
-                    $sql .= $this->DB_sql();
+                    $sql .= $this->DB_sql(true);
                     $result = $this->PDO->setCache($ckey, function () use ($sql, $fetch) {
                         return $this->PDO->SetSql($sql)->fetchResult(2, $fetch, $this->DB_BIND);
                     });
