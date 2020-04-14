@@ -6,10 +6,10 @@ class view
     const
     ENCODE_PREFIX = 'z-php-encode',
     ENCODE_END_CHAR = '#',
-    OPTIONS = LIBXML_NOBLANKS + LIBXML_HTML_NOIMPLIED + LIBXML_NOERROR + LIBXML_HTML_NODEFDTD + LIBXML_ERR_FATAL + LIBXML_COMPACT,
-    PREG_COMPRESS = ['/<!--(.|\s)*?-->/', '/[\n\r\t]+/', '/>\s+</', '/\s{2,}/'],
-    REPLACE_COMPRESS = ['', '', '><', ' '],
-    PREG_NOTES = '/<!--(.|\s)*?-->/',
+    OPTIONS = LIBXML_NSCLEAN + LIBXML_PARSEHUGE + LIBXML_NOBLANKS + LIBXML_NOERROR + LIBXML_HTML_NODEFDTD + LIBXML_ERR_FATAL + LIBXML_COMPACT,
+    PREG_COMPRESS = ['/<!--[\S\s]*-->|[\n\r]+/U', '/>\s+</U', '/\s{2,}/'],
+    REPLACE_COMPRESS = ['', '><', ' '],
+    PREG_NOTES = '/<!--[\S\s]*-->|[\n\r]+/U',
     REPLACE_NOTES = '';
 
     private static $TAG, $PRE, $SUF, $DOMS, $TPL, $FILE, $PARAMS, $RUN, $PREG, $CHANGED, $IMPORTS, $SEARCH_FIX, $REPLACE_FIX;
@@ -34,6 +34,7 @@ class view
         }, $html);
         return $html;
     }
+
     private static function replaceDecode($html)
     {
         $prefix = preg_quote(self::ENCODE_PREFIX);
@@ -48,6 +49,7 @@ class view
         }, $html);
         return $html;
     }
+
     private static function getTplInfo($name)
     {
         $name = trim($name, '/');
@@ -60,6 +62,7 @@ class view
         }
         return $info;
     }
+
     public static function GetTpl(string $name, $F = false)
     {
         if (!$name) {
@@ -118,15 +121,17 @@ class view
             throw new \Exception("template error: {$file}");
         }
     }
-    private static function format($html)
+
+    private static function compressHtml($html, $compress)
     {
-        $compress = $GLOBALS['ZPHP_CONFIG']['VIEW']['compress'] ?? false;
-        if ($compress) {
-            return preg_replace(self::PREG_COMPRESS, self::REPLACE_COMPRESS, $html);
-        } else {
-            return preg_replace(self::PREG_NOTES, self::REPLACE_NOTES, $html);
+        if (in_array($compress, [2, 3, 6, 7, 10, 11, 14, 15])) {
+            $html = preg_replace(self::PREG_COMPRESS, self::REPLACE_COMPRESS, $html);
+        } elseif (in_array($compress, [1, 5, 9, 13])) {
+            $html = preg_replace(self::PREG_NOTES, self::REPLACE_NOTES, $html);
         }
+        return $html;
     }
+
     private static function replaceTemplate($dom, $file = null)
     {
         $imports = $dom->getElementsByTagName(self::$TAG['import']);
@@ -162,6 +167,7 @@ class view
         $run[1] = explode('.', $name)[0];
         return $run;
     }
+
     public static function GetCache($time, $name = '')
     {
         $tpl = self::getTpl($name, true);
@@ -199,31 +205,34 @@ class view
             self::$CHANGED = filemtime($tpl);
             $dom = new \DOMDocument('1.0', 'UTF-8');
             $html = self::replaceEncode(file_get_contents($tpl));
-            $html = '<meta id="z-php-def-meta-utf-8" http-equiv="Content-Type" content="text/html; charset=utf-8">' . $html;
+            $html = '<meta http-equiv="Content-Type" content="text/html; charset=utf-8">' . $html;
             $dom->loadHTML($html, self::OPTIONS);
-            $rm = $dom->getElementById('z-php-def-meta-utf-8');
-            $dom->removeChild($rm);
             self::replaceTemplate($dom, $tpl);
-
             foreach (self::$IMPORTS as $v) {
                 $v->parentNode->removeChild($v);
             }
             if (!$run_time || self::$CHANGED > $run_time) {
+                if ($compress = $GLOBALS['ZPHP_CONFIG']['VIEW']['compress'] ?? 0) {
+                    in_array($compress, [4, 5, 6, 12, 13, 15]) && self::compressCss($dom);
+                    in_array($compress, [8, 9, 10, 12, 14, 15]) && self::compressJavaScript($dom);
+                }
                 self::replacePHP($dom);
                 $html = $dom->saveHTML();
                 $html = self::replaceDecode($html);
                 $html = str_replace('<?php }?><?php }else{?>', '<?php }else{?>', $html);
-                $html = self::format($html);
-                if (!file_put_contents($run_file, $html)) {
+                $compress && $html = self::compressHtml($html, $compress);
+                if (false === file_put_contents($run_file, $html)) {
                     throw new \Exception("file can not write:{$run_file}");
                 }
             }
         }
+
         self::$PARAMS && extract(self::$PARAMS);
         self::$TPL = null;
         ob_start() && require $run_file;
         $html = ob_get_contents();
         ob_end_clean();
+
         if ($cache) {
             $html_path = P_HTML_ . THEME . '/' . $run[0] . '/' . $run[1];
             $html_file = $html_path . '/' . md5(ROUTE['uri']) . '.html';
@@ -232,12 +241,37 @@ class view
             }
             $html_time = is_file($html_file) ? filemtime($html_file) : 0;
             if (!$html_time || $html_time + $cache < TIME) {
-                if (!file_put_contents($html_file, $html)) {
+                if (false === file_put_contents($html_file, $html)) {
                     throw new \Exception("file can not write:{$html_file}");
                 }
             }
         }
+
         return $html;
+    }
+
+    private static function compressJavaScript($dom)
+    {
+        $tags = $dom->getElementsByTagName('script');
+        if ($tags->length) {
+            $preg = ['/\/\*[\s\S]*\*\/|\/\/.*[\r\n]|[\n\r]+/U', '/\s*([\,\;\:\{\}\[\]\(\)\=])\s*/', '/\s{2,}/'];
+            $replace = ['', '$1', ' '];
+            foreach ($tags as $k => $v) {
+                $v->textContent = preg_replace($preg, $replace, $v->textContent);
+            }
+        }
+    }
+
+    private static function compressCss($dom)
+    {
+        $tags = $dom->getElementsByTagName('style');
+        if ($tags->length) {
+            $preg = ['/\/\*[\s\S]*\*\/|[\n\r]+/U', '/\s*([\,\;\:\{\}\[\]\(\)\=])\s*/', '/\s{2,}/'];
+            $replace = ['', '$1', ' '];
+            foreach ($tags as $k => $v) {
+                $v->textContent = preg_replace($preg, $replace, $v->textContent);
+            }
+        }
     }
 
     private static function replacePHP($dom)
@@ -247,44 +281,40 @@ class view
             $t = $tags[$i];
             $parent = $t->parentNode;
             if ($t->attributes->length) {
-                $code = '';
-                $d = [];
-                $lastNode = null;
-                $lastName = '';
-                for ($n = 0, $len = $t->attributes->length; $n !== $len; ++$n) {
-                    $a = $t->attributes[$n];
-                    switch ($a->name) {
-                        case 'case':
-                            $break = true;
-                            if (isset($t->attributes[1 + $n])) {
-                                $next = $t->attributes[1 + $n];
-                                if ('break' === $next->name) {
-                                    ++$n;
-                                    $break = 'false' === $next->value ? false : (bool) $next->value;
-                                }
-                            }
-                            $code .= 'default' === $a->value ? '<?php default:?>' : "<?php case {$a->value}:?>";
-                            $dd = $break ? '<?php break;?>' : '';
-                            break;
-                        case 'else':
-                            $code .= '<?php }else{?>';
-                            $dd = '<?php }?>';
-                            break;
-                        default:
-                            $code .= "<?php {$a->name}({$a->value}){?>";
-                            $dd = '<?php }?>';
-                    }
-                    $code = self::ENCODE_PREFIX . "{$n}=" . base64_encode($code) . self::ENCODE_END_CHAR;
-                    $d[] = self::ENCODE_PREFIX . "{$n}=" . base64_encode($dd) . self::ENCODE_END_CHAR;
+                $a = $t->attributes[0];
+                switch ($a->name) {
+                    case 'default':
+                        $code = '<?php default:?>';
+                        $dd = '';
+                        break;
+                    case 'break':
+                        $code = $t->attributes[1]->name ? "<?php {$a->name}({$a->value}){?>" : '';
+                        $dd = '<?php break;?>';
+                        break;
+                    case 'case':
+                        $code = 'default' === $a->value ? '<?php default:?>' : "<?php case {$a->value}:?>";
+                        $dd = 'break' === $t->attributes[1]->name ? '<?php break;?>' : '';
+                        break;
+                    case 'else':
+                        $code = '<?php }else{?>';
+                        $dd = '<?php }?>';
+                        break;
+                    default:
+                        $code = "<?php {$a->name}({$a->value}){?>";
+                        $dd = '<?php }?>';
                 }
-                $new = $dom->createTextNode($code);
-                $parent->insertBefore($new, $t);
+                if ($code) {
+                    $code = self::ENCODE_PREFIX . '0=' . base64_encode($code) . self::ENCODE_END_CHAR;
+                    $new = $dom->createTextNode($code);
+                    $parent->insertBefore($new, $t);
+                }
                 foreach ($t->childNodes as $c) {
                     $new = $c->cloneNode(true);
                     $parent->insertBefore($new, $t);
                 }
-                if ($d) {
-                    $str = $dom->createTextNode(implode('', $d));
+                if ($dd) {
+                    $dd = self::ENCODE_PREFIX . '0=' . base64_encode($dd) . self::ENCODE_END_CHAR;
+                    $str = $dom->createTextNode($dd);
                     $parent->insertBefore($str, $t);
                 }
                 $parent->removeChild($t);
@@ -295,15 +325,18 @@ class view
             }
         }
     }
+
     public static function Display(string $name = '', int $cache = 0)
     {
         $html = self::Fetch($name, $cache);
         echo $html;
     }
+
     public static function Assign($key, $val)
     {
         self::$PARAMS[$key] = $val;
     }
+
     public static function GetParams()
     {
         return self::$PARAMS;
