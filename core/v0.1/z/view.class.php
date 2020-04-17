@@ -170,7 +170,7 @@ class view
         return $run;
     }
 
-    public static function Fetch(string $name = '', $cache_path, $cache_file)
+    public static function Fetch(string $name = '', $cache_path = '', $cache_file = '')
     {
         $tpl = self::getTpl($name, true);
         2 === $GLOBALS['ZPHP_CONFIG']['DEBUG'] && debug::setMsg(1140, $tpl);
