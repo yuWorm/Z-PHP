@@ -328,7 +328,7 @@ class view
         }
     }
 
-    public static function Display(string $name = '', $time, $flag = 0)
+    public static function Display(string $name = '', $time = 0, $flag = 0)
     {
         if (!$time) {
             echo self::Fetch($name);
