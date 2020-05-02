@@ -790,7 +790,7 @@ class debug
         if (!$GLOBALS['ZPHP_CONFIG']['DEBUG']) {
             return;
         }
-
+        $errstr = TransCode($errstr);
         !IS_AJAX && $errstr = str_replace('\\', '\\\\', $errstr);
         self::$errs[$errno][] = "{$errstr} [" . str_replace('\\', '/', $errfile) . " ] : {$errline}";
     }
