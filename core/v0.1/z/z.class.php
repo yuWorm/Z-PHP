@@ -162,7 +162,7 @@ class router
         define('U_TMP', U_HOME . 'tmp');
         define('U_RES', U_HOME . 'res');
         define('U_RES_APP', U_RES . '/' . APP_NAME);
-        define('U_RES_VER', U_RES_APP . _VER);
+        define('U_RES_VER', U_RES_APP . '/' . _VER);
         define('TPL_EXT', $GLOBALS['ZPHP_CONFIG']['VIEW']['ext'] ?? '.html');
         define('THEME', $GLOBALS['ZPHP_CONFIG']['VIEW']['theme'] ?? 'default');
         define('P_VIEW_APP', P_APP_VER . 'view/');
