@@ -67,7 +67,8 @@ class view
         } elseif (isset(self::$FILE[$name])) {
             $file = self::$FILE[$name];
         } elseif (IsFullPath($name)) {
-            $file = '/' . $info['fullname'];
+            $info = pathinfo($name);
+            $file = isset($info['extension']) ? $name : $name . TPL_EXT;
         } else {
             $info = self::GetTplInfo($name);
             $arr = explode('/', $info['fullname']);
