@@ -661,9 +661,12 @@ class router
         }
         if (isset($arr[0]) && $route = $router["/{$info['ctrl']}/{$arr[0]}"] ?? false) {
             array_shift($arr);
-        } elseif (!$route = $router["/{$info['ctrl']}/*"] ?? $router["/{$info['ctrl']}"] ?? $router['*'] ?? false) {
-            throw new \Exception('没有匹配到路由, 不想看到此错误请配置 * 路由');
-        } elseif (empty($route['ctrl']) || empty($route['act'])) {
+        } elseif (!$route = $router["/{$info['ctrl']}/*"] ?? $router["/{$info['ctrl']}"] ?? false) {
+            if (!$route = 'index' === $info['ctrl'] && !$arr ? $router['/'] ?? false : $router['*'] ?? false) {
+                throw new \Exception('没有匹配到路由, 不想看到此错误请配置 * 路由');
+            }
+        }
+        if (empty($route['ctrl']) || empty($route['act'])) {
             throw new \Exception('必须设置路由的 ctrl 和 act');
         } elseif (false !== strpos($route['act'], '*') && $replace = array_shift($arr) ?: 'index') {
             $route['act'] = str_replace('*', $replace, $route['act']);
@@ -775,7 +778,7 @@ class debug
         header('status: 500');
         if ($isJson) {
             header('Content-Type:application/json; charset=utf-8');
-            $json = json_encode(['errMsg'=>$msg, 'trace' => $traceArr], 320);
+            $json = json_encode(['errMsg' => $msg, 'trace' => $traceArr], 320);
             die($json);
         } else {
             echo "<div style='background:#FFAEB9;padding:20px;'><h1>ERROR</h1><h2 style='font-size:16px;'>{$err}</h2><pre style='font-size:14px;'>\r\n{$traceMsg}</pre></div>";
