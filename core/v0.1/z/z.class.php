@@ -205,7 +205,7 @@ class router
         if (isset($route['module'])) {
             $module_path = APP_NAME . '/' . _VER . "/{$route['module']}";
             define('P_MODULE', P_APP_VER . $route['module'] . '/');
-            define('P_RES_MODULE', P_RES . $module_path);
+            define('P_RES_MODULE', P_RES . $module_path . '/');
             define('P_RUN_MODULE', P_RUN . $module_path . '/');
             define('P_HTML_MODULE', P_HTML . $module_path . '/');
             define('P_CACHE_MODULE', P_CACHE . $module_path . '/');
