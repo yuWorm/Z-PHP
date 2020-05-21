@@ -325,8 +325,17 @@ class db
 
         $ignore && $ignore = ' IGNORE';
         $sql = "INSERT{$ignore} INTO {$table} {$sql}";
-        $result = $this->PDO->SetSql($sql)->fetchResult(4, null, $this->DB_BIND);
-        $result && $this->DB_call('insert', ['result' => $result, 'data' => $data, 'sql' => $sql, 'bind' => $this->DB_BIND]);
+        if ($result = $this->PDO->SetSql($sql)->fetchResult(3, null, $this->DB_BIND)) {
+            if (isset($this->DB_BASE[$this->DB_TABLE]['prikey']) && is_array($this->DB_BASE[$this->DB_TABLE]['prikey'])) {
+                $result = [];
+                foreach ($this->DB_BASE[$this->DB_TABLE]['prikey'] as $key) {
+                    $result[$key] = $data[$key] ?? $this->PDO->LastId($key);
+                }
+            } else {
+                $result = $this->PDO->LastId() ?: true;
+            }
+            $this->DB_call('insert', ['result' => $result, 'data' => $data, 'sql' => $sql, 'bind' => $this->DB_BIND]);
+        }
         $this->DB_done();
         return $result;
     }
