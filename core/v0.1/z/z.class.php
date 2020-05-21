@@ -17,7 +17,7 @@ class z
         method_exists($ctrl, 'init') && $ctrl::init();
         $result = $ctrl::$act();
         method_exists($ctrl, 'after') && $ctrl::after();
-        isset($result) ? die($ctrl::json($result)) : debug::ShowMsg();
+        isset($result) ? die(ctrl::json($result)) : debug::ShowMsg();
         die;
     }
     private static function setSession()
@@ -725,6 +725,13 @@ class ctrl
         ob_end_clean();
         require $tpl;
         die;
+    }
+
+    public static function json($data)
+    {
+        ob_end_clean();
+        header('Content-Type:application/json; charset=utf-8');
+        die(json_encode($data, 320));
     }
 }
 class debug
