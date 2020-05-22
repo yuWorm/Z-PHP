@@ -567,16 +567,11 @@ class router
             }
         }
 
-        if (isset($args['params']) && $args['params']) {
-            foreach ($args['params'] as $k => $v) {
-                $params[] = $k;
-                $params[] = $v;
-            }
-        }
-
+        $query = $args['params'] ?? [];
+        empty($args['query']) || $query += $args['query'];
         isset($params) && $url .= '/' . implode('/', $params);
-        $ver && $args['query']['ver'] = $ver;
-        empty($args['query']) || $url .= '?' . http_build_query($args['query']);
+        $ver && $query['ver'] = $ver;
+        $query && $url .= '?' . http_build_query($query);
         return $url;
     }
 
