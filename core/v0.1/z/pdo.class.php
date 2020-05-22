@@ -165,9 +165,9 @@ class pdo
         $this->Z_SQL = $sql;
         return $this->fetchResult(-1);
     }
-    public function LastId()
+    public function LastId($name=null)
     {
-        return $this->Z_CONNECT[$this->Z_USEING]->lastInsertId() ?? null;
+        return $this->Z_CONNECT[$this->Z_USEING]->lastInsertId($name);
     }
     public function Submit($sql, $bind = null)
     {

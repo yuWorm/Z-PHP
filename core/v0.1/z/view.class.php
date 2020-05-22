@@ -153,9 +153,14 @@ class view
                         continue;
                     }
                     $new = $dom->importNode($n, true);
-                    $v->parentNode->insertBefore($new, $v);
+                    $inserts[] = [$v, $new];
                 }
                 self::$IMPORTS[] = $v;
+            }
+            if (isset($inserts)) {
+                foreach ($inserts as $v) {
+                    $v[0]->parentNode->insertBefore($v[1], $v[0]);
+                }
             }
         }
         return;
@@ -349,7 +354,8 @@ class view
         }
     }
 
-    private static function getCacheFile($flag, $run) {
+    private static function getCacheFile($flag, $run)
+    {
         if (!$flag) {
             $html_path = P_HTML_ . THEME . '/' . $run[0];
             $html_file = "{$html_path}/{$run[1]}.html";
