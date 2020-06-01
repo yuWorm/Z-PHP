@@ -388,7 +388,7 @@ class db
          * ]
          */
     }
-    public function Count($field = '')
+    public function Count($field = '', $done = true)
     {
         $field || $field = 'DISTINCT' === trim(strtoupper(substr($this->DB_FIELD, 0, 8))) ? $this->DB_FIELD : '*';
         $sql = $this->DB_sql(true, true);
@@ -399,6 +399,7 @@ class db
         } else {
             $result = $this->PDO->QueryField($sql, $this->DB_BIND);
         }
+        $done && $this->DB_done();
         return $result;
     }
     public function GetWhereByKey($key, $op = '=', $where = [])
@@ -453,7 +454,7 @@ class db
             return $this->DB_pageLimit();
         }
 
-        $rows = (int) $this->count();
+        $rows = (int) $this->count('', false);
         $this->DB_PAGED['num'] = (int) $this->DB_PAGE['num'] ?? 10;
         $pages = $this->DB_PAGED['pages'] = $rows ? (int) ceil($rows / $this->DB_PAGED['num']) : 1;
         $max = empty($this->DB_PAGE['max']) ? 0 : $this->DB_PAGED['num'] * $this->DB_PAGE['max'];
