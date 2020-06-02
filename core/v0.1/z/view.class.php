@@ -235,8 +235,10 @@ class view
             if (!file_exists(self::$CACHE[0]) && !mkdir(self::$CACHE[0], 0755, true)) {
                 throw new \Exception('file can not write: ' . self::$CACHE[0]);
             }
-            if (false === file_put_contents(self::$CACHE[1], $html, LOCK_EX)) {
-                throw new \Exception('file can not write: ' . self::$CACHE[1]);
+            if (!is_file(self::$CACHE[1]) || filemtime(self::$CACHE[1]) < TIME) {
+                if (false === file_put_contents(self::$CACHE[1], $html, LOCK_EX)) {
+                    throw new \Exception('file can not write: ' . self::$CACHE[1]);
+                }
             }
         }
         return $html;
@@ -248,7 +250,7 @@ class view
         $run = self::getRun($tpl);
         $cache = self::getCacheFile($flag, $run);
         $html_time = is_file($cache[1]) ? filemtime($cache[1]) : 0;
-        if ($html_time + $time > TIME) {
+        if ($html_time + $time >= TIME) {
             return ReadFileSH($cache[1]);
         } else {
             self::$DISPLAY_TPL = $tpl;
