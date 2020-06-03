@@ -129,7 +129,7 @@ class cache
                     }
                     is_callable($data) && $data = $data() ?: '';
                     if ($mem->set($key, serialize($data), $expire)) {
-                        $ld == $mem->get($lock_key) && $mem->del($lock_key);
+                        $ld == $mem->get($lock_key) && $mem->delete($lock_key);
                         $result = $data;
                     } else {
                         $result = false;

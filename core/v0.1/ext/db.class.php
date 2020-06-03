@@ -119,6 +119,10 @@ class db
         $this->PDO->Cache($expire);
         return $this;
     }
+    public function CleanCache($db, $table = '')
+    {
+        return $this->PDO->CleanCache($db, $table);
+    }
     public function Field($field = '')
     {
         $field && $this->DB_FIELD = $field;
@@ -234,23 +238,17 @@ class db
                 $this->DB_LIMIT = $this->DB_pageLimit();
                 $sqlc = $sql . $this->DB_sql();
                 $key = "{$sqlc}|2|{$fetch}" . serialize($this->DB_BIND) . serialize($this->DB_PAGE);
-                $pkey = md5("p{$key}");
-                if (empty($this->DB_CONFIG['cache_mod'])) {
-                    $path = P_CACHE . "DB_{$this->DB_CONFIG['db']}/{$this->DB_CONFIG['prefix']}" . (strstr($this->DB_TABLE, ' ', true) ?: $this->DB_TABLE);
-                    $ckey = md5($key);
-                    $ckey = "{$path}/{$ckey}/{$this->DB_PAGED['p']}.cache";
-                    $pkey = "{$path}/page/{$pkey}.cache";
-                } else {
-                    $ckey = md5("{$key}{$this->DB_PAGED['p']}");
-                }
-                $result = $this->PDO->getCache($ckey);
-                if (0 > $cached || false === $result || !$page = $this->PDO->getCache($pkey)) {
+                $ckey = md5($key);
+                $pkey = "{$ckey}-p";
+                $path = "{$this->DB_CONFIG['db']}/{$this->DB_CONFIG['prefix']}" . (strstr($this->DB_TABLE, ' ', true) ?: $this->DB_TABLE) . '/';
+                $result = $this->PDO->getCache($ckey, $path);
+                if (0 > $cached || false === $result || !$page = $this->PDO->getCache($pkey, $path)) {
                     $this->DB_page();
                     $sql .= $this->DB_sql(true);
                     $result = $this->PDO->setCache($ckey, function () use ($sql, $fetch) {
                         return $this->PDO->SetSql($sql)->fetchResult(2, $fetch, $this->DB_BIND);
-                    });
-                    $this->PDO->setCache($pkey, $this->DB_PAGED);
+                    }, $path);
+                    $this->PDO->setCache($pkey, $this->DB_PAGED, $path);
                     $this->PDO->Cache(null);
                 } else {
                     $this->DB_PAGED = $page;
@@ -533,7 +531,6 @@ class db
                 if (isset($this->DB_TABLES[$k])) {
                     unset($this->DB_VALID[$k]);
                 }
-
             }
         }
     }
