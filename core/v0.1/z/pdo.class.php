@@ -94,26 +94,32 @@ class pdo
     {
         return $this->Z_CACHE;
     }
-    public function setCache($ckey, $data)
+    public function setCache($ckey, $data, $path = '')
     {
         $timeout = abs($this->Z_CACHE);
         switch ($this->Z_CONFIG[0]['cache_mod'] ?? 0) {
             case 1:
+                $ckey = "DB:{$path}{$ckey}";
                 return cache::R($ckey, $data, $timeout, 2);
             case 2:
+                $ckey = "DB:{$path}{$ckey}";
                 return cache::M($ckey, $data, $timeout, 2);
             default:
+                $ckey = P_CACHE . "DB_{$path}{$ckey}.cache";
                 return cache::F($ckey, $data, $timeout, 2);
         }
     }
-    public function getCache($ckey)
+    public function getCache($ckey, $path = '')
     {
         switch ($this->Z_CONFIG[0]['cache_mod'] ?? 0) {
             case 1:
+                $ckey = "DB:{$path}{$ckey}";
                 return cache::R($ckey);
             case 2:
+                $ckey = "DB:{$path}{$ckey}";
                 return cache::M($ckey);
             default:
+                $ckey = P_CACHE . "DB_{$path}{$ckey}.cache";
                 return cache::F($ckey);
         }
     }
@@ -204,10 +210,49 @@ class pdo
     {
         return $this->Con($i)->commit();
     }
-    public static function Clear($path)
+    public function CleanCache($db, $table = '')
     {
-        $path = P_CACHE . "DB_{$path}";
+        $act = 'cleanCache' . ($this->Z_CONFIG[0]['cache_mod'] ?? 0);
+        return $this->$act($db, $table);
+    }
+    private function cleanCache0($db, $table)
+    {
+        $path = P_CACHE . "DB_{$db}";
+        $table && $path .= "/{$table}";
         return del_dir($path, true);
+    }
+    private function cleanCache1($db, $table)
+    {
+        $path = "DB:{$db}/";
+        $table && $path .= "{$table}/";
+        $redis = cache::Redis();
+        if($keys = $redis->keys("{$path}*")){
+            $redis->pipeline();
+            foreach($keys as $key){
+                $redis->del($key);
+            }
+            $result = $redis->exec();
+            $result && $result = array_sum($result);
+        }else{
+            $result = 0;
+        }
+        return $result;
+    }
+    private function cleanCache2($db, $table)
+    {
+        $path = "DB:{$db}/";
+        $table && $path .= "{$table}/";
+        $preg = "#^{$path}.+$#i";
+        $mem = cache::Memcached();
+        $n = 0;
+        if($keys = $mem->getAllKeys()){
+            foreach($keys as $key){
+                if(preg_match($preg, $key)){
+                    $n += $mem->delete($key);
+                }
+            }
+        }
+        return $n;
     }
     private function Z_fetch($type = 1, $fetch = null, $bind = null)
     {
