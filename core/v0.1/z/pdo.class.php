@@ -257,10 +257,10 @@ class pdo
     private function Z_fetch($type = 1, $fetch = null, $bind = null)
     {
         $this->Z_SQL = trim($this->Z_SQL);
+        $path = $this->Z_CONFIG[0]['db'] . '/' . self::Z_getTable($this->Z_SQL) . '/';
         if (isset($this->Z_CACHE) && (1 === $type || 2 === $type)) {
             $ckey = md5("{$this->Z_SQL}|{$type}|{$fetch}" . serialize($bind));
-            empty($this->Z_CONFIG[0]['cache_mod']) && $ckey = P_CACHE . "DB_{$this->Z_CONFIG[0]['db']}/" . self::Z_getTable($this->Z_SQL) . "/{$ckey}.cache";
-            $result = $this->getCache($ckey);
+            $result = $this->getCache($ckey, $path);
             if (0 < $this->Z_CACHE && false !== $result) {
                 $this->Z_CACHE = null;
                 return $result;
@@ -269,7 +269,7 @@ class pdo
         if (isset($ckey)) {
             $result = $this->setCache($ckey, function () use ($type, $fetch, $bind) {
                 return $this->fetchResult($type, $fetch, $bind);
-            });
+            }, $path);
         } else {
             $result = $this->fetchResult($type, $fetch, $bind);
         }
