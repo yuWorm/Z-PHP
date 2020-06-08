@@ -138,6 +138,7 @@ class z
 
 class router
 {
+    const VER_PREFIX = 'v';
     private static $IS_MODULE = 0,
     $MOD = 0,
     $STATE = 0,
@@ -162,7 +163,7 @@ class router
         define('U_TMP', U_HOME . 'tmp');
         define('U_RES', U_HOME . 'res');
         define('U_RES_APP', U_RES . '/' . APP_NAME);
-        define('U_RES_VER', U_RES_APP . '/' . _VER);
+        define('U_RES_VER', VER ? U_RES_APP . '/' . self::VER_PREFIX . VER : U_RES_APP);
         define('TPL_EXT', $GLOBALS['ZPHP_CONFIG']['VIEW']['ext'] ?? '.html');
         define('THEME', $GLOBALS['ZPHP_CONFIG']['VIEW']['theme'] ?? 'default');
         define('P_VIEW_APP', P_APP_VER . 'view/');
@@ -203,7 +204,7 @@ class router
         $route['query'] = isset($route['params']) ? $route['params'] + $_GET : $_GET;
         $route['uri'] = $_SERVER['REQUEST_URI'];
         if (isset($route['module'])) {
-            $module_path = APP_NAME . '/' . _VER . "/{$route['module']}";
+            $module_path = VER ? APP_NAME . '/' . self::VER_PREFIX . VER . "/{$route['module']}" : APP_NAME . "/{$route['module']}";
             define('P_MODULE', P_APP_VER . $route['module'] . '/');
             define('P_RES_MODULE', P_RES . $module_path . '/');
             define('P_RUN_MODULE', P_RUN . $module_path . '/');
@@ -254,8 +255,8 @@ class router
         $name || $name = APP_NAME;
         $ver || $ver = self::getVer($name);
         $path = P_ROOT . "app/{$name}/";
-        $router = is_file($file = "{$path}v{$ver}/common/router.php") || is_file($file = "{$path}v{$ver}/router.php") || is_file($file = "{$path}/router.php") ? require $file : false;
-
+        $ver && $ver = '/' . self::VER_PREFIX . $ver;
+        $router = is_file($file = "{$path}{$ver}/common/router.php") || is_file($file = "{$path}{$ver}/router.php") || is_file($file = "{$path}/router.php") ? require $file : false;
         isset($router['PATH']) && $router['PATH'] = trim($router['PATH'], '/');
         self::$ROUTER["{$name}-{$ver}"] = $router;
         return $router;
@@ -269,8 +270,8 @@ class router
         if (isset(self::$ROUTER[$key][$M])) {
             return self::$ROUTER[$key][$M];
         }
-
-        $module = P_ROOT . "app/{$name}/v{$ver}/{$m}/";
+        $ver && $ver = '/' . self::VER_PREFIX . $ver;
+        $module = P_ROOT . "app/{$name}{$ver}/{$m}/";
         $router = is_file($file = "{$module}common/router.php") ? require $file : false;
         if (isset(self::$ROUTER[$key][$m]) && is_array(self::$ROUTER[$key][$m])) {
             $router = $router ? $router + self::$ROUTER[$key][$m] : self::$ROUTER[$key][$m];
@@ -283,10 +284,9 @@ class router
         if (isset(self::$VER[$name])) {
             return self::$VER[$name];
         }
-
         $path = P_ROOT . "app/{$name}/";
         if ($conf = is_file($file = "{$path}config.php") ? require $file : false) {
-            self::$VER[$name] = isset($conf['VER'][1]) && $conf['VER'][1] ? $conf['VER'][1] : $conf['VER'][0] ?? null;
+            self::$VER[$name] = $conf['VER'][1] ?? $conf['VER'][0] ?? null;
         }
         self::$VER[$name] ?? self::$VER[$name] = VER;
         return self::$VER[$name];
@@ -296,10 +296,10 @@ class router
         if ($app === APP_NAME) {
             return self::$IS_MODULE;
         }
-
         $ver || $ver = self::getVer($app);
+        $ver && $ver = '/' . self::VER_PREFIX . $ver;
         if (!isset(self::$APP_ISMODULE[$app])) {
-            if (is_file($file = P_ROOT . "app/{$app}/v{$ver}/config.php") && $config = require $file) {
+            if (is_file($file = P_ROOT . "app/{$app}{$ver}/config.php") && $config = require $file) {
                 $ismodule = $config['MODULE'] ?? null;
             }
             if (!isset($ismodule) && is_file($file = P_ROOT . "app/{$app}/config.php") && $config = require $file) {
@@ -327,20 +327,25 @@ class router
     }
     public static function setVer()
     {
-        if (isset($GLOBALS['ZPHP_CONFIG']['VER'][1]) && $GLOBALS['ZPHP_CONFIG']['VER'][1]) {
+        if (isset($GLOBALS['ZPHP_CONFIG']['VER'][1])) {
             define('VER', $GLOBALS['ZPHP_CONFIG']['VER'][1]);
-        } elseif (isset($_GET['ver']) && ($ver = trim($_GET['ver'])) && file_exists($path = P_APP . "v{$ver}/")) {
+        } elseif (isset($_GET['ver']) && ($ver = trim($_GET['ver'])) && file_exists($path = P_APP . self::VER_PREFIX . "{$ver}/")) {
+            define('VER', $ver);
+            define('P_APP_VER', $path);
+        } elseif (($key = $GLOBALS['ZPHP_CONFIG']['HEADER_VER'] ?? false) && ($ver = $_SERVER["HTTP_{$key}"] ?? '')) {
             define('VER', $ver);
         } else {
-            $key = $GLOBALS['ZPHP_CONFIG']['HEADER_VER'] ?? false;
-            $ver = $key ? ($_SERVER["HTTP_{$key}"] ?? '') : '';
-            define('VER', $ver ?: $GLOBALS['ZPHP_CONFIG']['VER'][0] ?? '1');
+            define('VER', $GLOBALS['ZPHP_CONFIG']['VER'][0] ?? '');
         }
-        define('_VER', 'v' . VER);
-        $app_path = APP_NAME . '/' . _VER . '/';
+        if (!defined('P_APP_VER')) {
+            $path = VER ? P_APP . self::VER_PREFIX . VER . '/' : P_APP;
+            if (!file_exists($path)) {
+                throw new \Exception("directory does not exist: {$path}");
+            }
+            define('P_APP_VER', $path);
+        }
+        $app_path = VER ? APP_NAME . '/' . self::VER_PREFIX . VER . '/' : APP_NAME . '/';
         self::$VER[APP_NAME] = VER;
-        define('P_APP_VER', $path ?? P_APP . _VER . '/');
-
         define('P_RES_APP', P_PUBLIC . 'res/' . APP_NAME . '/');
         define('P_RUN_APP', P_RUN . APP_NAME . '/');
         define('P_HTML_APP', P_HTML . APP_NAME . '/');
