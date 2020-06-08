@@ -329,7 +329,7 @@ class router
     {
         if (isset($GLOBALS['ZPHP_CONFIG']['VER'][1]) && $GLOBALS['ZPHP_CONFIG']['VER'][1]) {
             define('VER', $GLOBALS['ZPHP_CONFIG']['VER'][1]);
-        } elseif (isset($_GET['ver']) && ($ver = trim($_GET['ver'])) && file_exists($path = P_APP . "v/{$ver}/")) {
+        } elseif (isset($_GET['ver']) && ($ver = trim($_GET['ver'])) && file_exists($path = P_APP . "v{$ver}/")) {
             define('VER', $ver);
         } else {
             $key = $GLOBALS['ZPHP_CONFIG']['HEADER_VER'] ?? false;
