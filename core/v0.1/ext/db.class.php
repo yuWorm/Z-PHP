@@ -338,6 +338,29 @@ class db
         return $result;
     }
 
+    // 批量插入数据（不执行数据验证！）
+    public function BatchInsert(array $keys, array $data, bool $ignore = false)
+    {
+        $table = $this->DB_table();
+        $values = str_repeat('?,', count($keys) - 1) . '?';
+        $keys = '`' . implode('`,`', $keys) . '`';
+        $ignore && $ignore = ' IGNORE';
+        $sql = "INSERT{$ignore} INTO {$table} ({$keys}) VALUES({$values})";
+        $h = $this->PDO->prepare($sql);
+        $i = 0;
+        if ($ignore) {
+            foreach ($data as $v) {
+                $h->execute($v);
+                $h->rowCount() && ++$i;
+            }
+        } else {
+            foreach ($data as $v) {
+                $h->execute($v) && ++$i;
+            }
+        }
+        return $i;
+    }
+
     public function IfUpdate($insert, $update = null)
     {
         $table = $this->DB_table();
