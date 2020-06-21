@@ -785,7 +785,7 @@ class debug
         header('status: 500');
         if ($isJson) {
             header('Content-Type:application/json; charset=utf-8');
-            $json = json_encode(['errMsg' => $msg, 'trace' => $traceArr], 320);
+            $json = json_encode(['errMsg' => $err, 'trace' => $traceArr], 320);
             die($json);
         } else {
             echo "<div style='background:#FFAEB9;padding:20px;'><h1>ERROR</h1><h2 style='font-size:16px;'>{$err}</h2><pre style='font-size:14px;'>\r\n{$traceMsg}</pre></div>";
