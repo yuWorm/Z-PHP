@@ -206,8 +206,10 @@ class view
             $html = '<meta http-equiv="Content-Type" content="text/html; charset=utf-8">' . $html;
             $dom->loadHTML($html, self::OPTIONS);
             self::replaceTemplate($dom, $tpl);
-            foreach (self::$IMPORTS as $v) {
-                $v->parentNode->removeChild($v);
+            if (self::$IMPORTS) {
+                foreach (self::$IMPORTS as $v) {
+                    $v->parentNode->removeChild($v);
+                }
             }
             if (!$run_time || self::$CHANGED > $run_time) {
                 if ($compress = $GLOBALS['ZPHP_CONFIG']['VIEW']['compress'] ?? 0) {
