@@ -277,7 +277,7 @@ class pdo
     }
     public function __call($func, $args = null)
     {
-        return call_user_func_array([$this->Con(0), $func], $args);
+        return $this->Con(0)->$func(...$args);
     }
     public function fetchResult($type = 1, $fetch = null, $bind = null, $en = 0)
     {

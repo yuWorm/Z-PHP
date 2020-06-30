@@ -202,7 +202,27 @@ class db
     }
     public function Fetch($lock = false)
     {
-        $sql = $this->DB_sql();
+        if (isset($this->DB_PAGE)) {
+            $this->DB_page();
+            if (!$this->DB_PAGED['r']) {
+                return new class
+
+                {
+                    function fetch()
+                    {
+                        return false;
+                    }
+                    function rowCount()
+                    {
+                        return 0;
+                    }
+                };
+            }
+
+            $sql = $this->DB_sql(true);
+        } else {
+            $sql = $this->DB_sql();
+        }
         $field = $this->DB_field();
         $sql = "SELECT {$field} FROM " . $sql;
         $lock && $sql .= ' FOR UPDATE';
@@ -257,7 +277,7 @@ class db
                 $this->DB_page();
                 $sql .= $this->DB_sql(true);
                 $lock && $sql .= ' FOR UPDATE';
-                $result = $this->PDO->SetSql($sql)->fetchResult(2, $fetch, $this->DB_BIND);
+                $result = $this->DB_PAGED['r'] ? $this->PDO->SetSql($sql)->fetchResult(2, $fetch, $this->DB_BIND) : [];
             }
         } else {
             $sql = $this->DB_sql(true);
@@ -477,19 +497,32 @@ class db
 
         $rows = (int) $this->count('', false);
         $this->DB_PAGED['num'] = (int) $this->DB_PAGE['num'] ?? 10;
-        $pages = $this->DB_PAGED['pages'] = $rows ? (int) ceil($rows / $this->DB_PAGED['num']) : 1;
-        $max = empty($this->DB_PAGE['max']) ? 0 : $this->DB_PAGED['num'] * $this->DB_PAGE['max'];
-        $max && $rows > $max && ($rows = $max) && $this->DB_PAGED['pages'] = $this->DB_PAGE['max'];
+        if ($max = empty($this->DB_PAGE['max']) ? 0 : $this->DB_PAGED['num'] * $this->DB_PAGE['max']) {
+            $rows > $max && $rows = $max;
+        }
         $this->DB_PAGED['rows'] = $rows;
-        $this->DB_LIMIT = $this->DB_pageLimit($this->DB_PAGED['pages']);
-        $p = $this->DB_PAGED['p'];
-        $var = $this->DB_PAGE['var'] ?? 'p';
-        $ver = $this->DB_PAGE['ver'] ?? '';
-        $mod = $this->DB_PAGE['mod'] ?? null;
-        $nourl = $this->DB_PAGE['nourl'] ?? 'javascript:;';
-        $params = ROUTE['params'] ?? false;
-        $query = $_GET;
+        $pages = $this->DB_PAGED['pages'] = $rows ? (int) ceil($rows / $this->DB_PAGED['num']) : 1;
+        $pmax = isset($this->DB_PAGE['inrange']) && !$this->DB_PAGE['inrange'] ? $max : $this->DB_PAGED['pages'];
+        $this->DB_LIMIT = $this->DB_pageLimit($pmax);
+        switch ($pages <=> $this->DB_PAGED['p']) {
+            case -1:
+                $this->DB_PAGED['r'] = 0;
+                break;
+            case 0:
+                $this->DB_PAGED['r'] = $rows % $this->DB_PAGED['num'];
+                break;
+            case 1:
+                $this->DB_PAGED['r'] = $this->DB_PAGED['num'];
+                break;
+        }
         if (is_array($this->DB_PAGE['return'])) {
+            $p = $this->DB_PAGED['p'];
+            $var = $this->DB_PAGE['var'] ?? 'p';
+            $ver = $this->DB_PAGE['ver'] ?? '';
+            $mod = $this->DB_PAGE['mod'] ?? null;
+            $nourl = $this->DB_PAGE['nourl'] ?? 'javascript:;';
+            $params = ROUTE['params'] ?? false;
+            $query = $_GET;
             foreach ($this->DB_PAGE['return'] as $v) {
                 switch ($v) {
                     case 'prev':
@@ -721,7 +754,8 @@ class db
                             $result = filter_var($value, FILTER_VALIDATE_INT, $options);
                             break;
                         case 'filter':
-                            $result = call_user_func_array('filter_var', $role['value'] ?? [FILTER_DEFAULT]);
+                            $filter = empty($role['value']) ? FILTER_DEFAULT : $role['value'];
+                            $result = is_array($filter) ? filter_var($value, ...$filter) : filter_var($value, $filter);
                             if (false === $result) {
                                 $data[$field] = $result;
                                 $result = true;
