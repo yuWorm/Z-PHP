@@ -509,7 +509,7 @@ class db
                 $this->DB_PAGED['r'] = 0;
                 break;
             case 0:
-                $this->DB_PAGED['r'] = $rows % $this->DB_PAGED['num'] ?: $this->DB_PAGED['num'];
+                $this->DB_PAGED['r'] = $rows % $this->DB_PAGED['num'] ?: ($rows ? $this->DB_PAGED['num'] : 0);
                 break;
             case 1:
                 $this->DB_PAGED['r'] = $this->DB_PAGED['num'];
