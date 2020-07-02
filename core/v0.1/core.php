@@ -8,7 +8,7 @@ function AppRun($entry)
     ini_set('date.timezone', 'Asia/Shanghai');
     define('TIME', $_SERVER['REQUEST_TIME']);
     define('MTIME', microtime(true));
-    define('ZPHP_VER', '4.0.4');
+    define('ZPHP_VER', '4.0.5');
     define('IS_AJAX', isset($_SERVER['HTTP_X_REQUESTED_WITH']) && 'xmlhttprequest' === strtolower($_SERVER['HTTP_X_REQUESTED_WITH']));
     define('IS_WX', false !== strpos($_SERVER['HTTP_USER_AGENT'], 'MicroMessenger'));
     define('METHOD', $_SERVER['REQUEST_METHOD']);
@@ -26,6 +26,7 @@ function AppRun($entry)
     define('LEN_IN', strlen(P_IN));
     define('P_PUBLIC', P_IN === P_ROOT ? P_IN . 'public/' : P_IN);
     define('P_RES', P_PUBLIC . 'res/');
+    define('Z_OS', 0 === stripos(strtoupper(PHP_OS), 'WIN') ? 'WINDOWS' : 'LINUX');
 
     $GLOBALS['ZPHP_MAPPING'] = [
         'z' => P_CORE . 'z/',
@@ -59,7 +60,7 @@ function Debug(int $i, $msg = '')
 }
 function IsFullPath(string $path): bool
 {
-    return 0 === stripos(PHP_OS, 'WIN') ? ':' === $path[1] : '/' === $path[0];
+    return 'WINDOWS' === Z_OS ? ':' === $path[1] : '/' === $path[0];
 }
 function SetConfig(string $key, $value)
 {
@@ -70,14 +71,11 @@ function SetConfig(string $key, $value)
     }
 }
 function ReadFileSH($file) {
-    if ($size = filesize($file)) {
-        $h = fopen($file, 'r');
-        if (!flock($h, LOCK_SH)) throw new \Exception('获取文件共享锁失败');
-        $result = fread($h, filesize($file));
-        flock($h, LOCK_UN) && fclose($h);
-    } else {
-        $result = '';
-    }
+    $h = fopen($file, 'r');
+    if (!flock($h, LOCK_SH)) throw new \Exception('获取文件共享锁失败');
+    $result = fread($h, filesize($file));
+    flock($h, LOCK_UN);
+    fclose($h);
     return $result;
 }
 function P($var, bool $echo = true)
