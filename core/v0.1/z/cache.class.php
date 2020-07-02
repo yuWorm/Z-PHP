@@ -178,6 +178,7 @@ class cache
                         $result = $result['Z-PHP-CACHE-TDATA'];
                     } else {
                         unlink($file);
+                        $result = false;
                     }
                 }
             }
