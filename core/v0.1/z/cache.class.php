@@ -3,6 +3,9 @@ namespace z;
 
 class cache
 {
+    const LOCK_EXPIRE = 30; // 获取缓存锁的超时时间(秒)
+    const LOCK_SLEEP = 1000; // 获取缓存锁的重试间隔(微秒)
+    const LOCK_KEY_PREFIX = 'z-php-lock:'; // 缓存锁的键名前缀
     private static $Z_REDIS, $Z_MEMCACHED;
     public static function Redis(array $c = null, bool $new = false)
     {
@@ -39,6 +42,63 @@ class cache
         }
         return self::$Z_MEMCACHED[$key];
     }
+
+    /**
+     * redis锁
+     * @param redis redis 连接实例
+     * @param key 键名
+     * @param expire 获取锁的超时时间（秒）
+     * @return 成功返回锁的键名，否则返回false
+     */
+    public static function Rlock($redis, string $key, int $expire = 0)
+    {
+        $lock_key = self::LOCK_KEY_PREFIX . $key;
+        if ($expire) {
+            if (!$r = $redis->set($lock_key, 1, ['nx', 'ex' => $expire])) {
+                $try = (int) $expire * 1000000 / self::LOCK_SLEEP - 1;
+                do {
+                    usleep(self::LOCK_SLEEP);
+                    $r = $redis->set($lock_key, 1, ['nx', 'ex' => $expire]);
+                } while (!$r && --$try);
+            }
+        } else {
+            $r = $redis->set($lock_key, 1, ['nx', 'ex' => self::LOCK_EXPIRE]);
+        }
+        return $r ? $lock_key : false;
+    }
+
+    /**
+     * memcached锁
+     * @param mem memcached 连接实例
+     * @param key 键名
+     * @param expire 获取锁的超时时间（秒）
+     * @return 成功返回锁的键名，否则返回false
+     */
+    public static function Mlock($mem, string $key, int $expire = 0)
+    {
+        $lock_key = self::LOCK_KEY_PREFIX . $key;
+        if ($expire) {
+            if (!$r = $mem->add($lock_key, 1, $expire)) {
+                $try = (int) $expire * 1000000 / self::LOCK_SLEEP - 1;
+                do {
+                    usleep(self::LOCK_SLEEP);
+                    $r = $mem->add($lock_key, 1, $expire);
+                } while (!$r && --$try);
+            }
+        } else {
+            $r = $mem->add($lock_key, 1, self::LOCK_EXPIRE);
+        }
+        return $r ? $lock_key : false;
+    }
+
+    /**
+     * Redis缓存操作
+     * @param key 缓存 key
+     * @param data 待写入的数据：为 null 时表示读取缓存，可以是一个回调函数，只在需要写入时调用
+     * @param expire 缓存时间：为假时表示不超时
+     * @param lock 并发锁
+     * @return 读取或写入的数据
+     */
     public static function R(string $key, $data = null, int $expire = null, int $lock = 0)
     {
         $redis = self::Redis();
@@ -46,52 +106,33 @@ class cache
         if (null === $data) {
             $result = $redis->get($key);
             $result && $result = unserialize($result);
-        } elseif ($expire) {
-            if ($lock) {
-                $lock_key = "lock:{$key}";
-                if (2 === $lock) {
-                    if ($redis->set($lock_key, 1, ['nx', 'ex' => 30])) {
-                        is_callable($data) && $data = $data() ?: '';
-                        if ($redis->setex($key, $expire, serialize($data))) {
-                            $redis->del($lock_key);
-                            $result = $data;
-                        } else {
-                            $result = false;
-                        }
-                    } else {
-                        do {
-                            usleep(2000);
-                            $result = $redis->get($key);
-                        } while (false === $result);
-                        $result = unserialize($result);
-                    }
-                } else {
-                    $ld = session_id() ?: uniqid('', true);
-                    while (!$redis->set($lock_key, 1, ['nx', 'ex' => 30])) {
-                        if (3 === $lock) {
-                            return false;
-                        }
-
-                        usleep(2000);
-                    }
-                    is_callable($data) && $data = $data() ?: '';
-                    if ($redis->setex($key, $expire, serialize($data))) {
-                        $ld == $redis->get($lock_key) && $redis->del($lock_key);
-                        $result = $data;
-                    } else {
-                        $result = false;
-                    }
-                }
-            } else {
+        } elseif ($lock) {
+            $lock_key = self::LOCK_KEY_PREFIX . $key;
+            if ($redis->set($lock_key, 1, ['nx', 'ex' => self::LOCK_EXPIRE])) {
                 is_callable($data) && $data = $data() ?: '';
-                $result = $redis->setex($key, $expire, serialize($data)) ? $data : false;
+                $r = $expire ? $redis->setex($key, $expire, serialize($data)) : $redis->set($key, serialize($data));
+                $redis->del($lock_key);
+                $result = $r ? $data : false;
+            } else {
+                $result = $redis->get($key);
+                $result && $result = unserialize($result);
             }
         } else {
-            $result = $redis->del($key);
+            is_callable($data) && $data = $data() ?: '';
+            $r = $expire ? $redis->setex($key, $expire, serialize($data)) : $redis->set($key, serialize($data));
+            $result = $r ? $data : false;
         }
         return $result;
     }
 
+    /**
+     * Memcached缓存操作
+     * @param key 缓存 key
+     * @param data 待写入的数据：为 null 时表示读取缓存，可以是一个回调函数，只在需要写入时调用
+     * @param expire 缓存时间：为假时表示不超时
+     * @param lock 并发锁
+     * @return 读取或写入的数据
+     */
     public static function M($key, $data = null, $expire = null, $lock = 0)
     {
         $mem = self::Memcached();
@@ -99,83 +140,119 @@ class cache
         if (null === $data) {
             $result = $mem->get($key);
             $result && $result = unserialize($result);
-        } elseif ($expire) {
-            if ($lock) {
-                $lock_key = "lock:{$key}";
-                if (2 === $lock) {
-                    if ($mem->add($lock_key, 1, 30)) {
-                        is_callable($data) && $data = $data() ?: '';
-                        if ($mem->set($key, serialize($data), $expire)) {
-                            $mem->delete($lock_key);
-                            $result = $data;
-                        } else {
-                            $result = false;
-                        }
-                    } else {
-                        do {
-                            usleep(2000);
-                            $result = $mem->get($key);
-                        } while (false === $result);
-                        $result = unserialize($result);
-                    }
-                } else {
-                    $ld = session_id() ?: uniqid('', true);
-                    while (!$mem->add($lock_key, $ld, 30)) {
-                        if (3 === $lock) {
-                            return false;
-                        }
-
-                        usleep(2000);
-                    }
-                    is_callable($data) && $data = $data() ?: '';
-                    if ($mem->set($key, serialize($data), $expire)) {
-                        $ld == $mem->get($lock_key) && $mem->delete($lock_key);
-                        $result = $data;
-                    } else {
-                        $result = false;
-                    }
-                }
-            } else {
+        } elseif ($lock) {
+            $lock_key = self::LOCK_KEY_PREFIX . $key;
+            if ($mem->add($lock_key, 1, self::LOCK_EXPIRE)) {
                 is_callable($data) && $data = $data() ?: '';
-                $result = $mem->set($key, serialize($data), $expire) ? $data : false;
+                $r = $expire ? $mem->set($key, serialize($data), $expire) : $mem->set($key, serialize($data));
+                $mem->delete($lock_key);
+                $result = $r ? $data : false;
+            } else {
+                $result = $mem->get($key);
+                $result && $result = unserialize($result);
             }
         } else {
-            $result = $mem->delete($key);
+            is_callable($data) && $data = $data() ?: '';
+            $r = $expire ? $mem->set($key, serialize($data), $expire) : $mem->set($key, serialize($data));
+            $result = $r ? $data : false;
         }
         return $result;
     }
-    public static function F($file, $data = null, $expire = null, $lock = 0)
+
+    /**
+     * 文件缓存操作
+     * @param file 文件路径
+     * @param data 待写入的数据：为 null 时表示读取缓存，可以是一个回调函数，只在需要写入时调用
+     * @param expire 缓存时间：为假时表示不超时
+     * @param lock 并发锁
+     * @return 读取或写入的数据
+     */
+    public static function F($file, $data = null, $expire = 0, $lock = 0)
     {
         IsFullPath($file) || $file = P_CACHE_ . $file;
         if (null === $data) {
-            if (!is_file($file) || !$str = ReadFileSH($file)) {
-                return false;
-            }
-            $result = unserialize($str);
-            if (isset($result['Z-PHP-CACHE-TIME-OUT'])) {
-                if (TIME < $result['Z-PHP-CACHE-TIME-OUT']) {
-                    $result = $result['Z-PHP-CACHE-TDATA'];
-                } else {
-                    unlink($file);
-                    $result = false;
+            if (is_file($file) && false !== ($str = ReadFileSH($file))) {
+                $result = unserialize($str);
+                if (isset($result['Z-PHP-CACHE-TIME-OUT'])) {
+                    if (TIME < $result['Z-PHP-CACHE-TIME-OUT']) {
+                        $result = $result['Z-PHP-CACHE-TDATA'];
+                    } else {
+                        unlink($file);
+                    }
                 }
             }
-        } elseif (0 === $expire) {
-            $result = is_file($file) && unlink($file);
+        } elseif ($lock) {
+            $expire && $data = function () use ($data, $expire) {
+                is_callable($data) && $data = $data();
+                return [
+                    'Z-PHP-CACHE-TDATA' => $data,
+                    'Z-PHP-CACHE-TIME-OUT' => TIME + $expire,
+                ];
+            };
+            $result = self::SetFileCache($file, $data);
+            isset($result['Z-PHP-CACHE-TDATA']) && $result = $result['Z-PHP-CACHE-TDATA'];
         } else {
-            file_exists($dir = dirname($file)) || mkdir($dir, 0755, true);
-            if (2 === $lock && is_file($file) && filemtime($file) >= TIME) {
-                $h = fopen($file, 'r');
-                flock($h, LOCK_SH);
-                $result = fread($h, filesize($file));
-                $result && $result = unserialize($str);
-                $result = $result['Z-PHP-CACHE-TDATA'] ?? $result;
-            } else {
-                is_callable($data) && $data = $data() ?: '';
-                $DATA = $expire ? ['Z-PHP-CACHE-TDATA' => $data, 'Z-PHP-CACHE-TIME-OUT' => TIME + $expire] : $data;
-                $result = false === file_put_contents($file, serialize($DATA), LOCK_EX) ? false : $data;
-            }
+            is_callable($data) && $data = $data();
+            $DATA = $expire ? ['Z-PHP-CACHE-TDATA' => $data, 'Z-PHP-CACHE-TIME-OUT' => TIME + $expire] : $data;
+            false === file_put_contents($file, serialize($data), LOCK_EX) || $result = $data;
         }
-        return $result;
+        return $result ?? false;
+    }
+
+    /**
+     * 写入文件缓存
+     * @param file 文件路径
+     * @param data 待写入的数据：可以是一个回调函数，只在需要写入时调用
+     * @return 写入的数据
+     * 高并发时只有单个进程可以获取到锁，并写入文件；其它进程将等待写入完成后读取该文件数据并返回
+     * 注意：windows 环境下如果同一秒内多次调用，只会写入一次！（不适合对时效要求很高[一秒内]的缓存）
+     */
+    public static function SetFileCache($file, $data)
+    {
+        return 'WINDOWS' === Z_OS ? self::setCacheWindows($file, $data) : self::setCacheLinux($file, $data);
+    }
+    private static function setCacheWindows($file, $data)
+    {
+        $lock_path = P_CACHE . 'lock_file/';
+        $lock_file = $lock_path . md5($file);
+        file_exists($lock_path) || mkdir($lock_path, 0755, true);
+        if (!$h = fopen($lock_file, 'w')) {
+            throw new \Exception('file can not write: ' . $lock_file);
+        }
+        if (flock($h, LOCK_EX)) {
+            file_exists($dir = dirname($file)) || mkdir($dir, 0755, true);
+            clearstatcache(true, $file);
+            if (!is_file($file) || filemtime($file) < TIME) {
+                file_exists($dir = dirname($file)) || mkdir($dir, 0755, true);
+                is_callable($data) && $data = $data();
+                if (false === file_put_contents($file, serialize($data), LOCK_EX)) {
+                    throw new \Exception('file can not write: ' . $file);
+                }
+                flock($h, LOCK_UN);
+                fclose($h);
+                return $data;
+            }
+            flock($h, LOCK_UN);
+        }
+        fclose($h);
+        $data = ReadFileSH($file);
+        return $data ? unserialize($data) : $data;
+    }
+    private static function setCacheLinux($file, $data)
+    {
+        file_exists($dir = dirname($file)) || mkdir($dir, 0755, true);
+        if (!$h = fopen($file, 'w')) {
+            throw new \Exception('file can not write: ' . $file);
+        }
+        if (flock($h, LOCK_EX | LOCK_NB)) {
+            is_callable($data) && $data = $data();
+            fwrite($h, serialize($data));
+            flock($h, LOCK_UN);
+            fclose($h);
+            return $data;
+        } else {
+            $data = ReadFileSH($file);
+            return $data ? unserialize($data) : $data;
+        }
     }
 }

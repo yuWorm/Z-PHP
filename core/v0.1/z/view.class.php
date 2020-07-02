@@ -8,7 +8,7 @@ class view
     ENCODE_END_CHAR = '#',
     OPTIONS = LIBXML_NSCLEAN + LIBXML_PARSEHUGE + LIBXML_NOBLANKS + LIBXML_NOERROR + LIBXML_HTML_NODEFDTD + LIBXML_ERR_FATAL + LIBXML_COMPACT;
 
-    private static $TAG, $PRE, $SUF, $DOMS, $TPL, $DISPLAY_TPL, $H, $CACHE, $FILE, $PARAMS, $RUN, $PREG, $CHANGED, $IMPORTS, $SEARCH_FIX, $REPLACE_FIX;
+    private static $TAG, $PRE, $SUF, $DOMS, $TPL, $DISPLAY_TPL, $H, $CACHE, $FILE, $PARAMS, $RUN, $PREG, $CHANGED, $IMPORTS, $SEARCH_FIX, $REPLACE_FIX, $LOCK;
     private static function replaceEncode($html)
     {
         $i = 0;
@@ -206,10 +206,8 @@ class view
             $html = '<meta http-equiv="Content-Type" content="text/html; charset=utf-8">' . $html;
             $dom->loadHTML($html, self::OPTIONS);
             self::replaceTemplate($dom, $tpl);
-            if (self::$IMPORTS) {
-                foreach (self::$IMPORTS as $v) {
-                    $v->parentNode->removeChild($v);
-                }
+            foreach (self::$IMPORTS as $v) {
+                $v->parentNode->removeChild($v);
             }
             if (!$run_time || self::$CHANGED > $run_time) {
                 if ($compress = $GLOBALS['ZPHP_CONFIG']['VIEW']['compress'] ?? 0) {
@@ -234,13 +232,10 @@ class view
         ob_end_clean();
 
         if (self::$CACHE) {
-            if (!file_exists(self::$CACHE[0]) && !mkdir(self::$CACHE[0], 0755, true)) {
-                throw new \Exception('file can not write: ' . self::$CACHE[0]);
-            }
-            if (!is_file(self::$CACHE[1]) || filemtime(self::$CACHE[1]) < TIME) {
-                if (false === file_put_contents(self::$CACHE[1], $html, LOCK_EX)) {
-                    throw new \Exception('file can not write: ' . self::$CACHE[1]);
-                }
+            if ($func = self::$LOCK) {
+                $func(self::$CACHE[1], $html);
+            } elseif (false === file_put_contents(self::$CACHE[1], $html, LOCK_EX)) {
+                throw new \Exception('file can not write: ' . self::$CACHE[1]);
             }
         }
         return $html;
@@ -255,11 +250,74 @@ class view
         if ($html_time + $time >= TIME) {
             return ReadFileSH($cache[1]);
         } else {
+            file_exists($dir = dirname($cache[1])) || mkdir($dir, 0755, true);
             self::$DISPLAY_TPL = $tpl;
             self::$CACHE = $cache;
             self::$RUN = $run;
+            switch ($GLOBALS['ZPHP_CONFIG']['DB']['cache_mod'] ?? 0) {
+                case 1:
+                    $redis = cache::Redis();
+                    if ($lock = cache::Rlock($redis, md5($cache[1]))) {
+                        self::$LOCK = function ($file, $html) use ($redis, $lock) {
+                            if (false === file_put_contents($file, $html, LOCK_EX)) {
+                                throw new \Exception('file can not write: ' . $file);
+                            }
+                            $redis->del($lock);
+                        };
+                        return false;
+                    }
+                    break;
+                case 2:
+                    $mem = cache::Memcached();
+                    if ($lock = cache::Mlock($mem, md5($cache[1]))) {
+                        self::$LOCK = function ($file, $html) use ($mem, $lock) {
+                            if (false === file_put_contents($file, $html, LOCK_EX)) {
+                                throw new \Exception('file can not write: ' . $file);
+                            }
+                            $mem->delete($lock);
+                        };
+                        return false;
+                    }
+                    break;
+                default:
+                    if ('WINDOWS' === Z_OS) {
+                        $lock_path = P_CACHE . 'lock_file/';
+                        $lock_file = $lock_path . md5($cache[1]);
+                        file_exists($lock_path) || mkdir($lock_path, 0755, true);
+                        if (!$h = fopen($lock_file, 'w')) {
+                            throw new \Exception('file can not write: ' . $lock_file);
+                        }
+                        if (flock($h, LOCK_EX)) {
+                            clearstatcache(true, $cache[1]);
+                            if (!is_file($cache[1]) || filemtime($cache[1]) < TIME) {
+                                self::$LOCK = function ($file, $html) use ($h) {
+                                    if (false === file_put_contents($file, $html, LOCK_EX)) {
+                                        throw new \Exception('file can not write: ' . $file);
+                                    }
+                                    flock($h, LOCK_UN);
+                                    fclose($h);
+                                };
+                                return false;
+                            }
+                            flock($h, LOCK_UN);
+                        }
+                        fclose($h);
+                    } else {
+                        if (!$h = fopen($cache[1], 'w')) {
+                            throw new \Exception('file can not write: ' . $cache[1]);
+                        }
+                        if (flock($h, LOCK_EX | LOCK_NB)) {
+                            self::$LOCK = function ($file, $html) use ($h) {
+                                fwrite($h, $html);
+                                flock($h, LOCK_UN);
+                                fclose($h);
+                            };
+                            return false;
+                        }
+                    }
+            }
+            return ReadFileSH($file);
         }
-        return false;
     }
 
     private static function compressJavaScript($dom, $compress)

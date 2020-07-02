@@ -82,7 +82,7 @@ class pdo
             default:
                 $index = (int) $i;
         }
-        $re || !isset($this->Z_CONNECT[$index]) && $this->Z_CONNECT[$index] = $this->zpdoConnect($index, $re);
+        if($re || !isset($this->Z_CONNECT[$index])) $this->Z_CONNECT[$index] = $this->zpdoConnect($index, $re);
         return $this->Z_CONNECT[$index];
     }
     public function Cache($expire = null)
