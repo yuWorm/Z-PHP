@@ -37,7 +37,7 @@ class cache
 
         $key = md5(serialize($c));
         if (!isset(self::$Z_MEMCACHED[$key])) {
-            self::$Z_MEMCACHED[$key] = new Memcached();
+            self::$Z_MEMCACHED[$key] = new \Memcached();
             self::$Z_MEMCACHED[$key]->addServers($c);
         }
         return self::$Z_MEMCACHED[$key];
@@ -210,7 +210,7 @@ class cache
      */
     public static function SetFileCache($file, $data)
     {
-        return 'WINDOWS' === Z_OS ? self::setCacheWindows($file, $data) : self::setCacheLinux($file, $data);
+        return 'WINDOWS' === ZPHP_OS ? self::setCacheWindows($file, $data) : self::setCacheLinux($file, $data);
     }
     private static function setCacheWindows($file, $data)
     {

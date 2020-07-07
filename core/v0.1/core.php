@@ -26,7 +26,7 @@ function AppRun($entry)
     define('LEN_IN', strlen(P_IN));
     define('P_PUBLIC', P_IN === P_ROOT ? P_IN . 'public/' : P_IN);
     define('P_RES', P_PUBLIC . 'res/');
-    define('Z_OS', 0 === stripos(strtoupper(PHP_OS), 'WIN') ? 'WINDOWS' : 'LINUX');
+    define('ZPHP_OS', 0 === stripos(strtoupper(PHP_OS), 'WIN') ? 'WINDOWS' : 'LINUX');
 
     $GLOBALS['ZPHP_MAPPING'] = [
         'z' => P_CORE . 'z/',
@@ -60,7 +60,7 @@ function Debug(int $i, $msg = '')
 }
 function IsFullPath(string $path): bool
 {
-    return 'WINDOWS' === Z_OS ? ':' === $path[1] : '/' === $path[0];
+    return 'WINDOWS' === ZPHP_OS ? ':' === $path[1] : '/' === $path[0];
 }
 function SetConfig(string $key, $value)
 {

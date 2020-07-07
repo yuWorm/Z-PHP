@@ -95,25 +95,35 @@ class view
         return $file;
     }
 
-    private static function getBlock($file)
+    private static function getBlock($file, $tid, $tname)
     {
         $key = md5($file);
-        if (!isset(self::$DOMS[$key])) {
+        $tplKey = md5("{$file}@{$tid}");
+        if (!$is = isset(self::$DOMS[$key])) {
             $time = filemtime($file);
             $time > self::$CHANGED && self::$CHANGED = $time;
             $html = self::replaceEncode(file_get_contents($file));
             $html = '<?xml encoding="UTF-8">' . $html;
-            $dom = new \DOMDocument('1.0', 'UTF-8');
-            $dom->loadHTML($html, self::OPTIONS);
-            self::$DOMS[$key] = $dom->getElementsByTagName(self::$TAG['template']);
+            self::$DOMS[$key] = new \DOMDocument('1.0', 'UTF-8');
+            self::$DOMS[$key]->loadHTML($html, self::OPTIONS);
             2 === $GLOBALS['ZPHP_CONFIG']['DEBUG'] && debug::setMsg(1140, $file);
         }
-        if (self::$DOMS[$key]->length) {
-            foreach (self::$DOMS[$key] as $k => $v) {
+        $nodes = self::$DOMS[$key]->getElementsByTagName(self::$TAG['template']);
+        if ($nodes->length) {
+            foreach ($nodes as $k => $v) {
                 $name = $v->getAttribute('name') ?: $k;
-                self::$TPL[$key][$name] = $v->childNodes;
+                if ($tid && $tname === $name) {
+                    $node = $v->cloneNode(true);
+                    $set = self::$DOMS[$key]->createElement('php', '$TEMP=$' . $tid . '');
+                    $unset = self::$DOMS[$key]->createElement('php', 'unset($TEMP)');
+                    $node->insertBefore($set, $node->firstChild);
+                    $node->appendChild($unset);
+                } else {
+                    $node = $v;
+                }
+                self::$TPL[$tplKey][$name] = $node->childNodes;
             }
-            self::replaceTemplate($dom, $file);
+            $is || self::replaceTemplate(self::$DOMS[$key], $file);
         } else {
             throw new \Exception("template error: {$file}");
         }
@@ -141,10 +151,11 @@ class view
         if ($imports->length) {
             foreach ($imports as $v) {
                 $name = $v->getAttribute('name');
+                $tid = $v->getAttribute('tid') ?: '';
                 $f = $v->getAttribute('file');
                 $tpl = $f ? self::GetTpl($f) : $file;
-                $key = md5($tpl);
-                isset(self::$TPL[$key]) || self::getBlock($tpl);
+                $key = md5("{$tpl}@{$tid}");
+                isset(self::$TPL[$key]) || self::getBlock($tpl, $tid, $name);
                 if (!isset(self::$TPL[$key][$name])) {
                     throw new \Exception("template tagName '{$name}' not exits : {$tpl}");
                 }
@@ -201,9 +212,9 @@ class view
             self::$PRE = $GLOBALS['ZPHP_CONFIG']['VIEW']['prefix'] ?? '<{';
             self::$SUF = $GLOBALS['ZPHP_CONFIG']['VIEW']['suffix'] ?? '}>';
             self::$CHANGED = filemtime($tpl);
+            $flag = '<meta flag="ZPHP-UTF-8" http-equiv="Content-Type" content="text/html; charset=utf-8">';
             $dom = new \DOMDocument('1.0', 'UTF-8');
-            $html = self::replaceEncode(file_get_contents($tpl));
-            $html = '<meta http-equiv="Content-Type" content="text/html; charset=utf-8">' . $html;
+            $html = $flag . self::replaceEncode(file_get_contents($tpl));
             $dom->loadHTML($html, self::OPTIONS);
             self::replaceTemplate($dom, $tpl);
             foreach (self::$IMPORTS as $v) {
@@ -217,7 +228,7 @@ class view
                 self::replacePHP($dom);
                 $html = $dom->saveHTML();
                 $html = self::replaceDecode($html);
-                $html = str_replace('<?php }?><?php }else{?>', '<?php }else{?>', $html);
+                $html = str_replace(['<?php }?><?php }else{?>', $flag], ['<?php }else{?>', ''], $html);
                 $html = self::compressHtml($html, $compress[0] ?? $compress);
                 if (false === file_put_contents($run_file, $html, LOCK_EX)) {
                     throw new \Exception("file can not write:{$run_file}");
@@ -280,7 +291,7 @@ class view
                     }
                     break;
                 default:
-                    if ('WINDOWS' === Z_OS) {
+                    if ('WINDOWS' === ZPHP_OS) {
                         $lock_path = P_CACHE . 'lock_file/';
                         $lock_file = $lock_path . md5($cache[1]);
                         file_exists($lock_path) || mkdir($lock_path, 0755, true);
