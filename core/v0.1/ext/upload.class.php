@@ -202,10 +202,8 @@ class upload
             $path .= '/' . trim($this->subPath, '/');
         }
 
-        if (!make_dir($path)) {
-            $this->error[] = "无法创建目录[{$path}]，请检查权限";
-            return false;
-        } elseif (!is_writable($path)) {
+        make_dir($path);
+        if (!is_writable($path)) {
             $this->error[] = "目录[{$path}]不可写，请检查权限";
             return false;
         } else {
@@ -222,7 +220,7 @@ class upload
     {
         $this->mapping[$i]['name'] = $this->getFileName($i);
         $this->mapping[$i]['path'] = "{$this->savePath}/{$this->mapping[$i]['name']}";
-        P_IN === P_PUBLIC && $this->mapping[$i]['src'] = U_HOME . substr($this->mapping[$i]['path'], LEN_IN);
+        $this->mapping[$i]['src'] = U_HOME . substr($this->mapping[$i]['path'], LEN_IN);
     }
 
     /**

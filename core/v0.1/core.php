@@ -106,7 +106,7 @@ function TransCode($str)
 }
 function make_dir($dir, $mode = 0755, $recursive = true)
 {
-    if (!file_exists($dir) && !mkdir(iconv('UTF-8', 'GBK', $dir), $mode, $recursive)) {
+    if (!file_exists($dir) && !mkdir($dir, $mode, $recursive)) {
         throw new Error("创建目录{$dir}失败,请检查权限");
     }
     return true;

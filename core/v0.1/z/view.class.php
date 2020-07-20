@@ -261,7 +261,7 @@ class view
         if ($html_time + $time >= TIME) {
             return ReadFileSH($cache[1]);
         } else {
-            file_exists($dir = dirname($cache[1])) || mkdir($dir, 0755, true);
+            make_dir(dirname($cache[1]));
             self::$DISPLAY_TPL = $tpl;
             self::$CACHE = $cache;
             self::$RUN = $run;
@@ -294,7 +294,7 @@ class view
                     if ('WINDOWS' === ZPHP_OS) {
                         $lock_path = P_CACHE . 'lock_file/';
                         $lock_file = $lock_path . md5($cache[1]);
-                        file_exists($lock_path) || mkdir($lock_path, 0755, true);
+                        make_dir($lock_path);
                         if (!$h = fopen($lock_file, 'w')) {
                             throw new \Exception('file can not write: ' . $lock_file);
                         }

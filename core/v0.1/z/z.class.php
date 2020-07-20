@@ -776,7 +776,7 @@ class debug
         $traceMsg = implode("\r\n", $traceArr);
         if ($ERROR_LOG) {
             $dir = P_RUN_APP . $ERROR_LOG;
-            !is_dir($dir) && mkdir(iconv("UTF-8", "GBK", $dir), 0755, true);
+            !is_dir($dir) && mkdir($dir, 0755, true);
             $file = "{$dir}/" . date('Ymd') . '.log';
             file_put_contents($file, '[' . date('H:i:s') . "] {$err}\r\n{$traceMsg}\r\n\r\n", FILE_APPEND);
         }
