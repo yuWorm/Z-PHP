@@ -6,6 +6,9 @@ function AppRun($entry)
 {
     error_reporting(E_ALL);
     ini_set('date.timezone', 'Asia/Shanghai');
+    $core = str_replace('\\', '/', dirname(__FILE__));
+    $p = explode('/', $core);
+    'core' === array_pop($p) || array_pop($p);
     define('TIME', $_SERVER['REQUEST_TIME']);
     define('MTIME', microtime(true));
     define('ZPHP_VER', '4.0.5');
@@ -13,8 +16,8 @@ function AppRun($entry)
     define('IS_WX', false !== strpos($_SERVER['HTTP_USER_AGENT'], 'MicroMessenger'));
     define('METHOD', $_SERVER['REQUEST_METHOD']);
     define('P_IN', str_replace('\\', '/', dirname($entry)) . '/');
-    define('P_CORE', str_replace('\\', '/', dirname(__FILE__) . '/'));
-    define('P_ROOT', dirname(dirname(P_CORE)) . '/');
+    define('P_CORE', $core . '/');
+    define('P_ROOT', implode('/', $p) . '/');
     define('P_TMP', P_ROOT . 'tmp/');
     define('P_BASE', P_ROOT . 'base/');
     define('P_LOG', P_ROOT . 'tmp/log/');
