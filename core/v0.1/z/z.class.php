@@ -182,7 +182,7 @@ class router
                     if (self::$IS_MODULE) {
                         $router = [];
                     } else {
-                        throw new \Exception('没用找到路由配置');
+                        throw new \Exception('没有找到路由配置');
                     }
 
                 }
