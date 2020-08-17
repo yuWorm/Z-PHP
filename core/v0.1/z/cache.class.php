@@ -204,55 +204,65 @@ class cache
      * 写入文件缓存
      * @param file 文件路径
      * @param data 待写入的数据：可以是一个回调函数，只在需要写入时调用
+     * @param export 数据为php代码
      * @return 写入的数据
      * 高并发时只有单个进程可以获取到锁，并写入文件；其它进程将等待写入完成后读取该文件数据并返回
      * 注意：windows 环境下如果同一秒内多次调用，只会写入一次！（不适合对时效要求很高[一秒内]的缓存）
      */
-    public static function SetFileCache($file, $data)
+    public static function SetFileCache($file, $data, $export = false)
     {
-        return 'WINDOWS' === ZPHP_OS ? self::setCacheWindows($file, $data) : self::setCacheLinux($file, $data);
+        return 'WINDOWS' === ZPHP_OS ? self::setCacheWindows($file, $data, $export) : self::setCacheLinux($file, $data, $export);
     }
-    private static function setCacheWindows($file, $data)
+    private static function setCacheWindows($file, $data, $export)
     {
         $lock_path = P_CACHE . 'lock_file/';
         $lock_file = $lock_path . md5($file);
-        make_dir($lock_path);
+        file_exists($lock_path) || make_dir($lock_path, 0755, true);
         if (!$h = fopen($lock_file, 'w')) {
             throw new \Exception('file can not write: ' . $lock_file);
         }
         if (flock($h, LOCK_EX)) {
-            make_dir(dirname($file));
+            file_exists($dir = dirname($file)) || make_dir($dir, 0755, true);
             clearstatcache(true, $file);
             if (!is_file($file) || filemtime($file) < TIME) {
+                file_exists($dir = dirname($file)) || make_dir($dir, 0755, true);
                 is_callable($data) && $data = $data();
-                if (false === file_put_contents($file, serialize($data), LOCK_EX)) {
+                if (false === file_put_contents($file, $export ? "<?php\nreturn " . var_export($data, true) . ';' : serialize($data), LOCK_EX)) {
                     throw new \Exception('file can not write: ' . $file);
                 }
                 flock($h, LOCK_UN);
                 fclose($h);
+                unlink($lock_file);
                 return $data;
             }
             flock($h, LOCK_UN);
         }
         fclose($h);
-        $data = ReadFileSH($file);
-        return $data ? unserialize($data) : $data;
+        if ($export) {
+            $data = require $file;
+        } else {
+            $data = ReadFileSH($file);
+            $data && $data = unserialize($data);
+        }
+        return $data;
     }
-    private static function setCacheLinux($file, $data)
+    private static function setCacheLinux($file, $data, $export)
     {
-        make_dir(dirname($file));
+        file_exists($dir = dirname($file)) || make_dir($dir, 0755, true);
         if (!$h = fopen($file, 'w')) {
             throw new \Exception('file can not write: ' . $file);
         }
         if (flock($h, LOCK_EX | LOCK_NB)) {
             is_callable($data) && $data = $data();
-            fwrite($h, serialize($data));
+            fwrite($h, $export ? "<?php\nreturn " . var_export($data, true) . ';' : serialize($data));
             flock($h, LOCK_UN);
             fclose($h);
-            return $data;
+        } elseif ($export) {
+            $data = require $file;
         } else {
             $data = ReadFileSH($file);
-            return $data ? unserialize($data) : $data;
+            $data && $data = unserialize($data);
         }
+        return $data;
     }
 }
