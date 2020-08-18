@@ -141,7 +141,6 @@ class router
     const VER_PREFIX = 'v';
     private static $IS_MODULE = 0,
     $MOD = 0,
-    $STATE = 0,
     $VER = [],
     $ROUTER = [],
     $FORMAT = [],
@@ -153,9 +152,9 @@ class router
         z::LoadConfig();
         self::setVer();
         z::LoadConfig(P_APP_VER . 'config.php');
-        self::$IS_MODULE = !empty($GLOBALS['ZPHP_CONFIG']['MODULE']);
+        self::$IS_MODULE = !empty($GLOBALS['ZPHP_CONFIG']['ROUTER']['module']);
         self::$IS_MODULE || z::LoadConfig(P_APP_VER . 'common/config.php');
-        self::$MOD = $GLOBALS['ZPHP_CONFIG']['URL_MOD'] ?? 'auto';
+        self::$MOD = $GLOBALS['ZPHP_CONFIG']['ROUTER']['mod'] ?? 'auto';
         $php = explode('/', trim($_SERVER['SCRIPT_NAME'], '/'));
         define('PHP_FILE', array_pop($php));
         define('U_ROOT', $php ? '/' . implode('/', $php) : '');
@@ -300,13 +299,13 @@ class router
         $ver && $ver = '/' . self::VER_PREFIX . $ver;
         if (!isset(self::$APP_ISMODULE[$app])) {
             if (is_file($file = P_ROOT . "app/{$app}{$ver}/config.php") && $config = require $file) {
-                $ismodule = $config['MODULE'] ?? null;
+                $ismodule = $config['ROUTER']['module'] ?? null;
             }
             if (!isset($ismodule) && is_file($file = P_ROOT . "app/{$app}/config.php") && $config = require $file) {
-                $ismodule = $config['MODULE'] ?? null;
+                $ismodule = $config['ROUTER']['module'] ?? null;
             }
             if (!isset($ismodule) && is_file($file = P_ROOT . 'common/config.php') && $config = require $file) {
-                $ismodule = $config['MODULE'] ?? false;
+                $ismodule = $config['ROUTER']['module'] ?? false;
             }
             self::$APP_ISMODULE[$app] = $ismodule;
         }
@@ -582,7 +581,7 @@ class router
 
     public static function Url($path, array $args = [], string $ver = '', $mod = null)
     {
-        isset($mod) || $mod = $GLOBALS['ZPHP_CONFIG']['URL_MOD'] ?? self::$MOD;
+        isset($mod) || $mod = $GLOBALS['ZPHP_CONFIG']['ROUTER']['mod'] ?? self::$MOD;
         if (is_array($mod)) {
             return self::U1($path, $args, $ver, $mod);
         }
@@ -596,9 +595,6 @@ class router
                 break;
             case 2:
                 $url = self::U2($path, $args, $ver);
-                break;
-            case 3:
-                $url = self::U1($path, $args, $ver, true);
                 break;
             default:
                 throw new \Exception('url参数4错误');
@@ -743,53 +739,45 @@ class debug
     {
         self::$pdotime += $time;
     }
-
-    private static function setTrace($k, $o)
-    {
-        $args = '';
-        if (isset($o['args']) && $o['args']) {
-            foreach ($o['args'] as $v) {
-                $args .= (is_object($v) ? get_class($v) : str_replace('\\\\', '\\', json_encode($v, 320))) . ',';
-            }
-            $args = rtrim($args, ',');
-        }
-        $called = ($o['class'] ?? '') . ($o['type'] ?? '') . "{$o['function']}({$args}) called";
-        $str = isset($o['file']) ? "#{$k} {$called} at [{$o['file']} :{$o['line']}]" : "#{$k} {$called}";
-        return $str;
-    }
     public static function exceptionHandler($e)
     {
-        $ERROR_LOG = $GLOBALS['ZPHP_CONFIG']['ERROR_LOG'] ?? false;
-        $msg = TransCode($e->getMessage());
-        $GLOBALS['ZPHP_CONFIG']['DEBUG'] || $ERROR_LOG || \z\ctrl::_500($msg);
-        $isJson = isset($GLOBALS['ZPHP_CONFIG']['DEBUG_MSG']) && 'json' === $GLOBALS['ZPHP_CONFIG']['DEBUG_MSG'];
-        $traceMsg = [];
-        $trace = $e->getTrace();
-        $file = $e->getFile();
-        $line = $e->getLine();
-        if ($trace) {
-            foreach ($trace as $k => $v) {
-                $traceArr[] = self::setTrace($k, $v);
+        $level = $GLOBALS['ZPHP_CONFIG']['DEBUG']['level'] ?? 3;
+        $log = $GLOBALS['ZPHP_CONFIG']['DEBUG']['log'] ?? 0;
+        !$log && 2 > $level && z::_500();
+        $msg = $e->getMessage();
+        $trace = $e->getTraceAsString();
+        foreach ($e->getTrace() as $k=>$v) {
+            $v['args'] && $args["#{$k}"] = 1 === count($v['args']) ? $v['args'][0] : $v['args'];
+        }
+        $args_str = isset($args) ? P($args, false) : '';
+        if($log){
+            $str = '[ERROR: ' . date('H:i:s') . "] {$msg}" . PHP_EOL . $trace . PHP_EOL;
+            $args_str && $str .= str_replace("\n", PHP_EOL, $args_str) . PHP_EOL;
+            self::log($str);
+        }
+        if($level > 1){
+            header('status: 500');
+            $type = $GLOBALS['ZPHP_CONFIG']['DEBUG']['type'] ?? 'html';
+            if('json' === $type){
+                $err = ['errMsg'=>$msg, 'trace'=>$trace];
+                isset($args) && $err['args'] = $args;
+                z::json($err);
+            }else{
+                echo "<style>body{margin:0;padding:0;}</style><div style='background:#FFBBDD;padding:1rem;width:100%;'><h2>ERROR!</h2><h3>{$msg}</h3>";
+                echo '<strong><pre>' . $trace . '</pre></strong>';
+                if (isset($args)) {
+                    echo '<h3>参数：</h3>';
+                    P($args);
+                }
+                die('</div>');
             }
         }
-        $err = "{$msg} at [{$file} : {$line}]";
-        $traceMsg = implode("\r\n", $traceArr);
-        if ($ERROR_LOG) {
-            $dir = P_RUN_APP . $ERROR_LOG;
-            !is_dir($dir) && mkdir($dir, 0755, true);
-            $file = "{$dir}/" . date('Ymd') . '.log';
-            file_put_contents($file, '[' . date('H:i:s') . "] {$err}\r\n{$traceMsg}\r\n\r\n", FILE_APPEND);
-        }
-
-        ob_end_clean();
-        header('status: 500');
-        if ($isJson) {
-            header('Content-Type:application/json; charset=utf-8');
-            $json = json_encode(['errMsg' => $err, 'trace' => $traceArr], 320);
-            die($json);
-        } else {
-            echo "<div style='background:#FFAEB9;padding:20px;'><h1>ERROR</h1><h2 style='font-size:16px;'>{$err}</h2><pre style='font-size:14px;'>\r\n{$traceMsg}</pre></div>";
-        }
+    }
+    private static function log($str){
+        $dir = P_TMP . '/error_log/' . APP_NAME;
+        !file_exists($dir) && !mkdir($dir, 0755, true);
+        $file = $dir . '/' . date() . '.log';
+        file_put_contents($file, $str . PHP_EOL, FILE_APPEND);
     }
     public static function setMsg($errno, $str)
     {
@@ -797,23 +785,32 @@ class debug
     }
     public static function errorHandler($errno, $errstr, $errfile, $errline)
     {
-        if (!$GLOBALS['ZPHP_CONFIG']['DEBUG']) {
-            return;
-        }
+        $level = $GLOBALS['ZPHP_CONFIG']['DEBUG']['level'] ?? 3;
+        $log = $GLOBALS['ZPHP_CONFIG']['DEBUG']['log'] ?? 0;
+        if($level < 3 && $log < 2) return;
         $errstr = TransCode($errstr);
-        !IS_AJAX && $errstr = str_replace('\\', '\\\\', $errstr);
-        self::$errs[$errno][] = "{$errstr} [" . str_replace('\\', '/', $errfile) . " ] : {$errline}";
+        $log > 1 && self::log('[WARNING: ' . date('H:i:s') . "] {$errstr}" . PHP_EOL);
+        if ($level > 2) {
+            IS_AJAX || $errstr = str_replace('\\', '\\\\', $errstr);
+            self::$errs[$errno][] = "{$errstr} [" . str_replace('\\', '/', $errfile) . " ] : {$errline}";
+        }
     }
-    public static function GetJsonDebug()
+    public static function GetJsonDebug($level)
     {
-        $json['运行'] = [
-            'SQL查询' => round(1000 * self::$pdotime, 3) . 'ms',
-            '运行时间' => round(1000 * (microtime(true) - MTIME), 3) . 'ms',
-            '内存使用' => FileSizeFormat(memory_get_usage()),
-            '内存峰值' => FileSizeFormat(memory_get_peak_usage()),
-        ];
-        if (2 === $GLOBALS['ZPHP_CONFIG']['DEBUG']) {
-            ($p = view::GetParams()) && self::$errs[1150] = $p;
+        if ($level) {
+            $json['运行'] = [
+                'SQL查询' => round(1000 * self::$pdotime, 3) . 'ms',
+                '运行时间' => round(1000 * (microtime(true) - MTIME), 3) . 'ms',
+                '内存使用' => FileSizeFormat(memory_get_usage()),
+                '内存峰值' => FileSizeFormat(memory_get_peak_usage()),
+            ];
+        }
+        if (2 < $level) {
+            is_file($file = $GLOBALS['ZPHP_MAPPING']['libs'] . 'view.class.php')
+            && (require $file)
+            && !class_exists('\libs\view', false)
+            && ($params = \libs\view::GetParams())
+            && self::$errs[1150] = $params;
             $json['文件'] = get_included_files();
             $json['环境'] = $_SERVER;
             $json['POST'] = $_POST;
@@ -821,50 +818,53 @@ class debug
             $json['配置'] = $GLOBALS['ZPHP_CONFIG'];
             $json['命名空间'] = $GLOBALS['ZPHP_MAPPING'];
         }
-        foreach (self::$errs as $k => $v) {
-            $json[self::ERRTYPE[$k]] = $v;
+        if (1 < $level) {
+            foreach (self::$errs as $k => $v) {
+                $json[self::ERRTYPE[$k]] = $v;
+            }
         }
-        return $json;
+        return $json ?? null;
     }
     public static function ShowMsg()
     {
-        if (!$GLOBALS['ZPHP_CONFIG']['DEBUG']) {
+        if (!$level = $GLOBALS['ZPHP_CONFIG']['DEBUG']['level'] ?? 0){
             die;
         }
-
-        switch ($GLOBALS['ZPHP_CONFIG']['DEBUG_MSG'] ?? '') {
+        switch ($GLOBALS['ZPHP_CONFIG']['DEBUG']['type'] ?? '') {
             case 'html':
-                self::ShowHtml();
+                self::ShowHtml($level);
                 break;
             case 'json':
-                self::ShowJson();
+                self::ShowJson($level);
                 break;
             default:
-                IS_WX ? self::ShowHtml() : self::ShowJson();
+                IS_WX ? self::ShowHtml($level) : self::ShowJson($level);
                 break;
         }
     }
-    public static function ShowJson()
+    public static function ShowJson($level)
     {
-        $json = json_encode(self::GetJsonDebug());
+        $json = json_encode(self::GetJsonDebug($level));
         die("<script>console.log({$json})</script>");
     }
     public static function ShowHtml()
     {
         $runtime = microtime(true) - MTIME;
         $html = $tab = '';
-        if (2 === $GLOBALS['ZPHP_CONFIG']['DEBUG']) {
+        if (2 < $level) {
             self::getConfigs();
             self::getServer();
             self::getConstants();
             self::getIncludeFiles();
             self::getMapping();
+            self::getPost();
+            self::getParams();
         }
-        self::getPost();
-        self::getParams();
-        foreach (self::$errs as $k => $v) {
-            $tab .= "<button type=\"button\" id=\"{$k}\" tid=\"{$k}\">" . self::ERRTYPE[$k] . ':[' . count($v) . ']</button>';
-            $html .= "<div id=\"zdebug-li{$k}\"><p># " . implode('</p><p># ', $v) . '</p></div>';
+        if (1 < $level) {
+            foreach (self::$errs as $k => $v) {
+                $tab .= "<button type=\"button\" id=\"{$k}\" tid=\"{$k}\">" . self::ERRTYPE[$k] . ':[' . count($v) . ']</button>';
+                $html .= "<div id=\"zdebug-li{$k}\"><p># " . implode('</p><p># ', $v) . '</p></div>';
+            }
         }
         require P_CORE . 'tpl/debug.tpl';
         die;
@@ -906,9 +906,7 @@ class debug
     }
     private static function getPost()
     {
-        if (!$_POST) {
-            self::$errs[1160] = $_POST;
-        } else {
+        if($_POST){
             foreach ($_POST as $k => $v) {
                 $str = htmlspecialchars(json_encode($v, 320));
                 self::$errs[1160][] = "[{$k}] : {$str}";
