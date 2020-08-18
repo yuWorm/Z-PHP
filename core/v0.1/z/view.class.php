@@ -8,7 +8,7 @@ class view
     ENCODE_END_CHAR = '#',
     OPTIONS = LIBXML_NSCLEAN + LIBXML_PARSEHUGE + LIBXML_NOBLANKS + LIBXML_NOERROR + LIBXML_HTML_NODEFDTD + LIBXML_ERR_FATAL + LIBXML_COMPACT;
 
-    private static $TAG, $PRE, $SUF, $DOMS, $TPL, $DISPLAY_TPL, $H, $CACHE, $FILE, $PARAMS, $RUN, $PREG, $CHANGED, $IMPORTS, $SEARCH_FIX, $REPLACE_FIX, $LOCK;
+    private static $TAG, $PRE, $SUF, $TPL, $DISPLAY_TPL, $CACHE, $FILE, $PARAMS, $RUN, $CHANGED, $LOCK;
     private static function replaceEncode($html)
     {
         $i = 0;
@@ -94,39 +94,44 @@ class view
         self::$FILE[$name] = $file;
         return $file;
     }
-
-    private static function getBlock($file, $tid, $tname)
+    private static function getBlock($file, $key)
     {
-        $key = md5($file);
-        $tplKey = md5("{$file}@{$tid}");
-        if (!$is = isset(self::$DOMS[$key])) {
             $time = filemtime($file);
             $time > self::$CHANGED && self::$CHANGED = $time;
             $html = self::replaceEncode(file_get_contents($file));
             $html = '<?xml encoding="UTF-8">' . $html;
-            self::$DOMS[$key] = new \DOMDocument('1.0', 'UTF-8');
-            self::$DOMS[$key]->loadHTML($html, self::OPTIONS);
-            2 === $GLOBALS['ZPHP_CONFIG']['DEBUG'] && debug::setMsg(1140, $file);
-        }
-        $nodes = self::$DOMS[$key]->getElementsByTagName(self::$TAG['template']);
-        if ($nodes->length) {
-            foreach ($nodes as $k => $v) {
-                $name = $v->getAttribute('name') ?: $k;
-                if ($tid && $tname === $name) {
-                    $node = $v->cloneNode(true);
-                    $set = self::$DOMS[$key]->createElement('php', '$TEMP=$' . $tid . '');
-                    $unset = self::$DOMS[$key]->createElement('php', 'unset($TEMP)');
-                    $node->insertBefore($set, $node->firstChild);
-                    $node->appendChild($unset);
-                } else {
-                    $node = $v;
+            $dom = new \DOMDocument('1.0', 'UTF-8');
+            $dom->loadHTML($html, self::OPTIONS);
+            2 < $GLOBALS['ZPHP_CONFIG']['DEBUG']['level'] && debug::setMsg(1140, $file);
+            $nodes = $dom->getElementsByTagName(self::$TAG['template']);
+            if ($nodes->length) {
+                foreach ($nodes as $k => $v) {
+                    $name = $v->getAttribute('name');
+                    $name && self::$TPL[$key][$name] = $v;
                 }
-                self::$TPL[$tplKey][$name] = $node->childNodes;
+            } else {
+                throw new \Exception("template error: {$file}");
             }
-            $is || self::replaceTemplate(self::$DOMS[$key], $file);
-        } else {
-            throw new \Exception("template error: {$file}");
+            return $dom;
+    }
+    private static function setNodes($name, $key, $parent, $dom){
+        if ($parent->attributes->length > 2 && $attrs = self::setAttrs($parent->attributes, $name)) {
+            $node = self::$TPL[$key][$name]->cloneNode(true);
+            $setStr = implode(';', $attrs);
+            $set = $dom->createElement('php', $setStr);
+            $parent->parentNode->insertBefore($set, $parent);
+        }else{
+            $node = self::$TPL[$key][$name];
         }
+        $nodes = $node->childNodes;
+        foreach ($nodes as $n) {
+            if (1 !== $n->nodeType || self::$TAG['import'] === $n->tagName) {
+                continue;
+            }
+            $new = $dom->importNode($n, true);
+            $parent->parentNode->insertBefore($new, $parent);
+        }
+        $parent->parentNode->removeChild($parent);
     }
 
     private static function compressHtml($html, $compress)
@@ -145,36 +150,34 @@ class view
         return $html;
     }
 
+    private static function setAttrs($attrs, $name){
+        foreach($attrs as $attr){
+            if(':' === $attr->name[0]){
+                $n = ltrim($attr->name, ':');
+                $v = $attr->value ?: $n;
+                $key = '$' . $n;
+                $sets[] = "{$key} = {$v} ?? null";
+            }
+        }
+        return $sets ?? false;
+    }
     private static function replaceTemplate($dom, $file = null)
     {
         $imports = $dom->getElementsByTagName(self::$TAG['import']);
         if ($imports->length) {
             foreach ($imports as $v) {
                 $name = $v->getAttribute('name');
-                $tid = $v->getAttribute('tid') ?: '';
                 $f = $v->getAttribute('file');
                 $tpl = $f ? self::GetTpl($f) : $file;
-                $key = md5("{$tpl}@{$tid}");
-                isset(self::$TPL[$key]) || self::getBlock($tpl, $tid, $name);
+                $key = md5($tpl);
+                isset(self::$TPL[$key]) || $D = self::getBlock($tpl, $key);
                 if (!isset(self::$TPL[$key][$name])) {
                     throw new \Exception("template tagName '{$name}' not exits : {$tpl}");
                 }
-                foreach (self::$TPL[$key][$name] as $k => $n) {
-                    if (1 !== $n->nodeType || self::$TAG['import'] === $n->tagName) {
-                        continue;
-                    }
-                    $new = $dom->importNode($n, true);
-                    $inserts[] = [$v, $new];
-                }
-                self::$IMPORTS[] = $v;
-            }
-            if (isset($inserts)) {
-                foreach ($inserts as $v) {
-                    $v[0]->parentNode->insertBefore($v[1], $v[0]);
-                }
+                self::setNodes($name, $key, $v, $dom);
+                self::replaceTemplate($dom);
             }
         }
-        return;
     }
 
     private static function getRun($file)
@@ -196,7 +199,7 @@ class view
             $tpl = self::GetTpl($name, true);
             $run = self::getRun($tpl);
         }
-        2 === $GLOBALS['ZPHP_CONFIG']['DEBUG'] && debug::setMsg(1140, $tpl);
+        2 < $GLOBALS['ZPHP_CONFIG']['DEBUG']['level'] && debug::setMsg(1140, $tpl);
         isset(self::$TAG) || self::$TAG = [
             'php' => $GLOBALS['ZPHP_CONFIG']['VIEW']['php_tag'] ?? 'php',
             'import' => $GLOBALS['ZPHP_CONFIG']['VIEW']['import_tag'] ?? 'import',
@@ -205,8 +208,8 @@ class view
         $run_path = P_RUN_ . THEME;
         $run_file = $run_path . '/' . $run[0] . '-' . $run[1] . '.php';
         $run_time = is_file($run_file) ? filemtime($run_file) : 0;
-        if ($GLOBALS['ZPHP_CONFIG']['DEBUG'] || !$run_time) {
-            if (!file_exists($run_path) && !mkdir($run_path, 0755, true)) {
+        if (1 < $GLOBALS['ZPHP_CONFIG']['DEBUG']['level'] || !$run_time) {
+            if (!file_exists($run_path) && !make_dir($run_path, 0755, true)) {
                 throw new \Exception("file can not write: {$run_path}");
             }
             self::$PRE = $GLOBALS['ZPHP_CONFIG']['VIEW']['prefix'] ?? '<{';
@@ -217,9 +220,6 @@ class view
             $html = $flag . self::replaceEncode(file_get_contents($tpl));
             $dom->loadHTML($html, self::OPTIONS);
             self::replaceTemplate($dom, $tpl);
-            foreach (self::$IMPORTS as $v) {
-                $v->parentNode->removeChild($v);
-            }
             if (!$run_time || self::$CHANGED > $run_time) {
                 if ($compress = $GLOBALS['ZPHP_CONFIG']['VIEW']['compress'] ?? 0) {
                     self::compressCss($dom, $compress[1] ?? $compress);
@@ -261,7 +261,7 @@ class view
         if ($html_time + $time >= TIME) {
             return ReadFileSH($cache[1]);
         } else {
-            make_dir(dirname($cache[1]));
+            file_exists($dir = dirname($cache[1])) || make_dir($dir, 0755, true);
             self::$DISPLAY_TPL = $tpl;
             self::$CACHE = $cache;
             self::$RUN = $run;
@@ -294,7 +294,7 @@ class view
                     if ('WINDOWS' === ZPHP_OS) {
                         $lock_path = P_CACHE . 'lock_file/';
                         $lock_file = $lock_path . md5($cache[1]);
-                        make_dir($lock_path);
+                        file_exists($lock_path) || make_dir($lock_path, 0755, true);
                         if (!$h = fopen($lock_file, 'w')) {
                             throw new \Exception('file can not write: ' . $lock_file);
                         }

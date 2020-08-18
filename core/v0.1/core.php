@@ -4,14 +4,13 @@ use z\router;
 use z\z;
 function AppRun($entry)
 {
+    define('ZPHP_VER', '4.1.0');
     error_reporting(E_ALL);
-    ini_set('date.timezone', 'Asia/Shanghai');
     $core = str_replace('\\', '/', dirname(__FILE__));
     $p = explode('/', $core);
     'core' === array_pop($p) || array_pop($p);
     define('TIME', $_SERVER['REQUEST_TIME']);
     define('MTIME', microtime(true));
-    define('ZPHP_VER', '4.0.5');
     define('IS_AJAX', isset($_SERVER['HTTP_X_REQUESTED_WITH']) && 'xmlhttprequest' === strtolower($_SERVER['HTTP_X_REQUESTED_WITH']));
     define('IS_WX', false !== strpos($_SERVER['HTTP_USER_AGENT'], 'MicroMessenger'));
     define('METHOD', $_SERVER['REQUEST_METHOD']);
@@ -42,7 +41,9 @@ function AppRun($entry)
     set_exception_handler('\z\debug::exceptionHandler');
     spl_autoload_register('\z\z::AutoLoad');
     router::init();
-    if ($GLOBALS['ZPHP_CONFIG']['DEBUG'] ?? $GLOBALS['ZPHP_CONFIG']['DEBUG'] = 1) {
+    ini_set('date.timezone', $GLOBALS['ZPHP_CONFIG']['TIME_ZONE'] ?? 'Asia/Shanghai');
+    isset($GLOBALS['ZPHP_CONFIG']['DEBUG']['level']) || $GLOBALS['ZPHP_CONFIG']['DEBUG']['level'] = 3;
+    if ($GLOBALS['ZPHP_CONFIG']['DEBUG']['level'] > 1) {
         ini_set('display_errors', 'On');
         set_error_handler('\z\debug::errorHandler');
         ini_set('expose_php', 'Off');
@@ -58,8 +59,8 @@ function Zautoload(string $act)
 }
 function Debug(int $i, $msg = '')
 {
-    $GLOBALS['ZPHP_CONFIG']['DEBUG'] = $i;
-    $msg && $GLOBALS['ZPHP_CONFIG']['DEBUG_MSG'] = $msg;
+    $GLOBALS['ZPHP_CONFIG']['DEBUG']['level'] = $i;
+    $msg && $GLOBALS['ZPHP_CONFIG']['DEBUG']['type'] = $msg;
 }
 function IsFullPath(string $path): bool
 {
