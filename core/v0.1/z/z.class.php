@@ -769,7 +769,8 @@ class debug
                 isset($args) && $err['args'] = $args;
                 ctrl::json($err);
             }else{
-                echo "<style>body{margin:0;padding:0;}</style><div style='background:#FFBBDD;padding:1rem;width:100%;'><h2>ERROR!</h2><h3>{$msg}</h3>";
+                $trace = str_replace('\\\\', '\\', $trace);
+                echo "<style>body{margin:0;padding:0;}</style><div style='background:#FFBBDD;padding:1rem;'><h2>ERROR!</h2><h3>{$msg}</h3>";
                 echo '<strong><pre>' . $trace . '</pre></strong>';
                 if (isset($args)) {
                     echo '<h3>参数：</h3>';
@@ -801,8 +802,9 @@ class debug
             self::$errs[$errno][] = "{$errstr} [" . str_replace('\\', '/', $errfile) . " ] : {$errline}";
         }
     }
-    public static function GetJsonDebug($level)
+    public static function GetJsonDebug($level = null)
     {
+        null === $level && $level = $GLOBALS['ZPHP_CONFIG']['DEBUG']['level'] ?? 0;
         if ($level) {
             $json['运行'] = [
                 'SQL查询' => round(1000 * self::$pdotime, 3) . 'ms',
@@ -853,7 +855,7 @@ class debug
         $json = json_encode(self::GetJsonDebug($level));
         die("<script>console.log({$json})</script>");
     }
-    public static function ShowHtml()
+    public static function ShowHtml($level)
     {
         $runtime = microtime(true) - MTIME;
         $html = $tab = '';
