@@ -209,7 +209,7 @@ class view
         $run_file = $run_path . '/' . $run[0] . '-' . $run[1] . '.php';
         $run_time = is_file($run_file) ? filemtime($run_file) : 0;
         if (1 < $GLOBALS['ZPHP_CONFIG']['DEBUG']['level'] || !$run_time) {
-            if (!file_exists($run_path) && !make_dir($run_path, 0755, true)) {
+            if (!file_exists($run_path) && !MakeDir($run_path, 0755, true)) {
                 throw new \Exception("file can not write: {$run_path}");
             }
             self::$PRE = $GLOBALS['ZPHP_CONFIG']['VIEW']['prefix'] ?? '<{';
@@ -261,7 +261,7 @@ class view
         if ($html_time + $time >= TIME) {
             return ReadFileSH($cache[1]);
         } else {
-            file_exists($dir = dirname($cache[1])) || make_dir($dir, 0755, true);
+            file_exists($dir = dirname($cache[1])) || MakeDir($dir, 0755, true);
             self::$DISPLAY_TPL = $tpl;
             self::$CACHE = $cache;
             self::$RUN = $run;
@@ -294,7 +294,7 @@ class view
                     if ('WINDOWS' === ZPHP_OS) {
                         $lock_path = P_CACHE . 'lock_file/';
                         $lock_file = $lock_path . md5($cache[1]);
-                        file_exists($lock_path) || make_dir($lock_path, 0755, true);
+                        file_exists($lock_path) || MakeDir($lock_path, 0755, true);
                         if (!$h = fopen($lock_file, 'w')) {
                             throw new \Exception('file can not write: ' . $lock_file);
                         }

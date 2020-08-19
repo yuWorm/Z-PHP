@@ -202,7 +202,7 @@ class upload
             $path .= '/' . trim($this->subPath, '/');
         }
 
-        make_dir($path);
+        MakeDir($path);
         if (!is_writable($path)) {
             $this->error[] = "目录[{$path}]不可写，请检查权限";
             return false;

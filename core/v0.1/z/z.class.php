@@ -13,7 +13,13 @@ class z
         header('X-Powered-By: ' . ($GLOBALS['ZPHP_CONFIG']['POWEREDBY'] ?? 'Z-PHP'));
         $ctrl = '\\ctrl\\' . ROUTE['ctrl'];
         $act = ROUTE['act'];
-        $GLOBALS['ZPHP_CONFIG']['DEBUG'] || method_exists($ctrl, $act) || class_exists($ctrl, false) && $ctrl::_404() || ctrl::_404();
+        is_file($file = $GLOBALS['ZPHP_MAPPING']['ctrl'] . ROUTE['ctrl'] . '.class.php') && require $file;
+        if ($GLOBALS['ZPHP_CONFIG']['DEBUG']['level'] < 2) {
+            if (!class_exists($ctrl, false)) {
+                ctrl::_404();
+            }
+            method_exists($ctrl, $act) || (method_exists($ctrl, '_404') ? $ctrl::_404() : ctrl::_404());
+        }
         method_exists($ctrl, 'init') && $ctrl::init();
         $result = $ctrl::$act();
         method_exists($ctrl, 'after') && $ctrl::after();
@@ -761,7 +767,7 @@ class debug
             if('json' === $type){
                 $err = ['errMsg'=>$msg, 'trace'=>$trace];
                 isset($args) && $err['args'] = $args;
-                z::json($err);
+                ctrl::json($err);
             }else{
                 echo "<style>body{margin:0;padding:0;}</style><div style='background:#FFBBDD;padding:1rem;width:100%;'><h2>ERROR!</h2><h3>{$msg}</h3>";
                 echo '<strong><pre>' . $trace . '</pre></strong>';
