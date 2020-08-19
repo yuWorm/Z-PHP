@@ -9,6 +9,12 @@ function AppRun($entry)
     $core = str_replace('\\', '/', dirname(__FILE__));
     $p = explode('/', $core);
     'core' === array_pop($p) || array_pop($p);
+    $php = explode('/', trim($_SERVER['SCRIPT_NAME'], '/'));
+    define('ZPHP_OS', 0 === stripos(strtoupper(PHP_OS), 'WIN') ? 'WINDOWS' : 'LINUX');
+    define('PHP_FILE', array_pop($php));
+    define('U_ROOT', $php ? '/' . implode('/', $php) : '');
+    define('U_HOME', U_ROOT . '/');
+    define('U_TMP', U_HOME . 'tmp');
     define('TIME', $_SERVER['REQUEST_TIME']);
     define('MTIME', microtime(true));
     define('IS_AJAX', isset($_SERVER['HTTP_X_REQUESTED_WITH']) && 'xmlhttprequest' === strtolower($_SERVER['HTTP_X_REQUESTED_WITH']));
@@ -25,11 +31,21 @@ function AppRun($entry)
     define('P_CACHE', P_ROOT . 'tmp/cache/');
     define('P_APP', P_ROOT . 'app/' . APP_NAME . '/');
     define('P_COMMON', P_ROOT . 'common/');
+    define('P_RUN_APP', P_RUN . APP_NAME . '/');
+    define('P_HTML_APP', P_HTML . APP_NAME . '/');
+    define('P_CACHE_APP', P_CACHE . APP_NAME . '/');
     define('LEN_IN', strlen(P_IN));
-    define('P_PUBLIC', P_IN === P_ROOT ? P_IN . 'public/' : P_IN);
+    if (P_IN === P_ROOT) {
+        define('P_PUBLIC', P_IN . 'public/');
+        define('U_PUBLIC', U_HOME . 'public');
+    } else {
+        define('P_PUBLIC', P_IN);
+        define('U_PUBLIC', U_ROOT);
+    }
     define('P_RES', P_PUBLIC . 'res/');
-    define('ZPHP_OS', 0 === stripos(strtoupper(PHP_OS), 'WIN') ? 'WINDOWS' : 'LINUX');
-
+    define('P_RES_APP', P_RES . APP_NAME . '/');
+    define('U_RES', U_PUBLIC . '/res');
+    define('U_RES_APP', U_RES . '/' . APP_NAME);
     $GLOBALS['ZPHP_MAPPING'] = [
         'z' => P_CORE . 'z/',
         'ext' => P_CORE . 'ext/',
@@ -73,9 +89,12 @@ function SetConfig(string $key, $value)
         $GLOBALS['ZPHP_CONFIG'][$key] = $value;
     }
 }
-function ReadFileSH($file) {
+function ReadFileSH($file)
+{
     $h = fopen($file, 'r');
-    if (!flock($h, LOCK_SH)) throw new \Exception('获取文件共享锁失败');
+    if (!flock($h, LOCK_SH)) {
+        throw new \Exception('获取文件共享锁失败');
+    }
     $result = fread($h, filesize($file));
     flock($h, LOCK_UN);
     fclose($h);

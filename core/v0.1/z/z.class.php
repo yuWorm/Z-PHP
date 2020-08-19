@@ -31,7 +31,6 @@ class z
         if (isset($GLOBALS['ZPHP_CONFIG']['SESSION']['auto']) && !$GLOBALS['ZPHP_CONFIG']['SESSION']['auto']) {
             return;
         }
-
         self::SessionStart();
     }
     public static function SessionStart()
@@ -151,8 +150,7 @@ class router
     $ROUTER = [],
     $FORMAT = [],
     $APP_ISMODULE,
-        $APP_MAP
-    ;
+        $APP_MAP;
     public static function init()
     {
         z::LoadConfig();
@@ -161,13 +159,6 @@ class router
         self::$IS_MODULE = !empty($GLOBALS['ZPHP_CONFIG']['ROUTER']['module']);
         self::$IS_MODULE || z::LoadConfig(P_APP_VER . 'common/config.php');
         self::$MOD = $GLOBALS['ZPHP_CONFIG']['ROUTER']['mod'] ?? 'auto';
-        $php = explode('/', trim($_SERVER['SCRIPT_NAME'], '/'));
-        define('PHP_FILE', array_pop($php));
-        define('U_ROOT', $php ? '/' . implode('/', $php) : '');
-        define('U_HOME', U_ROOT . '/');
-        define('U_TMP', U_HOME . 'tmp');
-        define('U_RES', U_HOME . 'res');
-        define('U_RES_APP', U_RES . '/' . APP_NAME);
         define('U_RES_VER', VER ? U_RES_APP . '/' . self::VER_PREFIX . VER : U_RES_APP);
         define('TPL_EXT', $GLOBALS['ZPHP_CONFIG']['VIEW']['ext'] ?? '.html');
         define('THEME', $GLOBALS['ZPHP_CONFIG']['VIEW']['theme'] ?? 'default');
@@ -189,7 +180,6 @@ class router
                     } else {
                         throw new \Exception('没有找到路由配置');
                     }
-
                 }
                 $route = self::route($pathinfo, $router);
                 break;
@@ -217,12 +207,10 @@ class router
             define('P_CACHE_MODULE', P_CACHE . $module_path . '/');
             define('U_RES_MODULE', U_RES . "/{$module_path}");
             define('U_RES_', U_RES_MODULE);
-
             define('P_RES_', P_RES_MODULE);
             define('P_RUN_', P_RUN_MODULE);
             define('P_HTML_', P_HTML_MODULE);
             define('P_CACHE_', P_CACHE_MODULE);
-
             define('P_VIEW_MODULE', P_MODULE . 'view/');
             define('P_VIEW_', P_VIEW_MODULE);
             define('P_THEME_MODULE', P_VIEW_MODULE . THEME . '/');
@@ -238,7 +226,6 @@ class router
             define('P_HTML_', P_HTML_APP);
             define('P_CACHE_', P_CACHE_APP);
             define('U_RES_', U_RES_APP);
-
             define('P_VIEW_', P_VIEW_APP);
             define('P_THEME_', P_THEME_APP);
         }
@@ -322,7 +309,6 @@ class router
         if (isset(self::$APP_MAP[$php])) {
             return self::$APP_MAP[$php];
         }
-
         if (is_file($file = P_IN . $php) && $str = file_get_contents($file)) {
             $preg = '/define.+\,\s*\'(\w+)\'\s*\)/';
             preg_match($preg, $str, $match);
@@ -351,11 +337,6 @@ class router
         }
         $app_path = VER ? APP_NAME . '/' . self::VER_PREFIX . VER . '/' : APP_NAME . '/';
         self::$VER[APP_NAME] = VER;
-        define('P_RES_APP', P_PUBLIC . 'res/' . APP_NAME . '/');
-        define('P_RUN_APP', P_RUN . APP_NAME . '/');
-        define('P_HTML_APP', P_HTML . APP_NAME . '/');
-        define('P_CACHE_APP', P_CACHE . APP_NAME . '/');
-
         define('P_RES_VER', P_PUBLIC . 'res/' . $app_path);
         define('P_RUN_VER', P_RUN . $app_path);
         define('P_HTML_VER', P_HTML . $app_path);
@@ -366,11 +347,9 @@ class router
         $name || $name = APP_NAME;
         $ver || $ver = self::getVer($name);
         $key = "{$name}-{$ver}-{$m}";
-
         if (isset(self::$FORMAT[$key])) {
             return self::$FORMAT[$key];
         }
-
         if (!$router = $m ? self::getModuleRouter($m, $name, $ver) : (self::$ROUTER["{$name}-{$ver}"] ?? self::router($name, $ver))) {
             $data = false;
         } else {
@@ -480,7 +459,6 @@ class router
     {
         $Q = self::getUf($path, $ver);
         $url = self::getInPath($Q, $ver);
-
         if (isset($Q['m']) && 'index' === $Q['m']) {
             unset($Q['m']);
         }
@@ -490,7 +468,6 @@ class router
         if ('index' === $Q['c']) {
             unset($Q['c']);
         }
-
         if ('index' === $Q['a']) {
             unset($Q['a']);
         }
@@ -500,7 +477,6 @@ class router
             if (!isset($args['params']) && !isset($args['query'])) {
                 $Q += $args;
             }
-
         }
         $ver && $Q['ver'] = $ver;
         $Q && $url .= '?' . http_build_query($Q);
@@ -576,7 +552,6 @@ class router
                 }
             }
         }
-
         $query = $args['params'] ?? [];
         empty($args['query']) || $query += $args['query'];
         isset($params) && $url .= '/' . implode('/', $params);
@@ -591,7 +566,6 @@ class router
         if (is_array($mod)) {
             return self::U1($path, $args, $ver, $mod);
         }
-
         switch ($mod) {
             case 0:
                 $url = self::U0($path, $args, $ver);
@@ -635,7 +609,6 @@ class router
         if (isset($GLOBALS['ZPHP_CONFIG']['RESTFUL']) && $act = strtolower($_SERVER['REQUEST_METHOD'])) {
             $act = $GLOBALS['ZPHP_CONFIG']['RESTFUL'][$act] ?? $act;
         }
-
         self::$IS_MODULE && $info['module'] = array_shift($params);
         $info['ctrl'] = $params ? array_shift($params) : 'index';
         return [$info, $params];
@@ -753,23 +726,23 @@ class debug
         $msg = $e->getMessage();
         $trace = $e->getTraceAsString();
         $trace = str_replace('\\\\', '\\', $trace);
-        foreach ($e->getTrace() as $k=>$v) {
+        foreach ($e->getTrace() as $k => $v) {
             $v['args'] && $args["#{$k}"] = 1 === count($v['args']) ? $v['args'][0] : $v['args'];
         }
         $args_str = isset($args) ? P($args, false) : '';
-        if($log){
+        if ($log) {
             $str = $msg . PHP_EOL . $trace . PHP_EOL;
-            $args_str && $str .=  'args: ' . str_replace("\n", PHP_EOL, $args_str);
+            $args_str && $str .= 'args: ' . str_replace("\n", PHP_EOL, $args_str);
             self::log($str, 'error');
         }
-        if($level > 1){
+        if ($level > 1) {
             header('status: 500');
             $type = $GLOBALS['ZPHP_CONFIG']['DEBUG']['type'] ?? 'html';
-            if('json' === $type){
-                $err = ['errMsg'=>$msg, 'trace'=>$trace];
+            if ('json' === $type) {
+                $err = ['errMsg' => $msg, 'trace' => $trace];
                 isset($args) && $err['args'] = $args;
                 ctrl::json($err);
-            }else{
+            } else {
                 echo "<style>body{margin:0;padding:0;}</style><div style='background:#FFBBDD;padding:1rem;'><h2>ERROR!</h2><h3>{$msg}</h3>";
                 echo '<strong><pre>' . $trace . '</pre></strong>';
                 if (isset($args)) {
@@ -780,7 +753,8 @@ class debug
             }
         }
     }
-    private static function log($str, $type){
+    private static function log($str, $type)
+    {
         $dir = P_TMP . "/{$type}_log/" . APP_NAME;
         !file_exists($dir) && !mkdir($dir, 0755, true);
         $file = $dir . '/' . date('Y-m-d') . '.log';
@@ -795,7 +769,10 @@ class debug
     {
         $level = $GLOBALS['ZPHP_CONFIG']['DEBUG']['level'] ?? 3;
         $log = $GLOBALS['ZPHP_CONFIG']['DEBUG']['log'] ?? 0;
-        if($level < 3 && $log < 2) return;
+        if ($level < 3 && $log < 2) {
+            return;
+        }
+
         $errstr = TransCode($errstr);
         $errfile = '[' . str_replace('\\', '/', $errfile) . " ] : {$errline}";
         $log > 1 && self::log("{$errstr} {$errfile}", 'warning');
@@ -837,7 +814,7 @@ class debug
     }
     public static function ShowMsg()
     {
-        if (!$level = $GLOBALS['ZPHP_CONFIG']['DEBUG']['level'] ?? 0){
+        if (!$level = $GLOBALS['ZPHP_CONFIG']['DEBUG']['level'] ?? 0) {
             die;
         }
         switch ($GLOBALS['ZPHP_CONFIG']['DEBUG']['type'] ?? '') {
@@ -916,7 +893,7 @@ class debug
     }
     private static function getPost()
     {
-        if($_POST){
+        if ($_POST) {
             foreach ($_POST as $k => $v) {
                 $str = htmlspecialchars(json_encode($v, 320));
                 self::$errs[1160][] = "[{$k}] : {$str}";
