@@ -590,9 +590,9 @@ class router
         } else {
             $route['ctrl'] = 'index';
         }
-        if (isset($GLOBALS['ZPHP_CONFIG']['RESTFUL'])) {
+        if (isset($GLOBALS['ZPHP_CONFIG']['ROUTER']['restfull'])) {
             $act = strtolower($_SERVER['REQUEST_METHOD']);
-            $route['act'] = $GLOBALS['ZPHP_CONFIG']['RESTFUL'][$act] ?? $act;
+            $route['act'] = $GLOBALS['ZPHP_CONFIG']['ROUTER']['restfull'][$act] ?? $act;
         } else {
             if (isset($_GET['a'])) {
                 $route['act'] = $_GET['a'] ?: 'index';
@@ -606,8 +606,8 @@ class router
     private static function pathinfo2arr(string $pathinfo)
     {
         $params = $pathinfo ? explode('/', $pathinfo) : ['index'];
-        if (isset($GLOBALS['ZPHP_CONFIG']['RESTFUL']) && $act = strtolower($_SERVER['REQUEST_METHOD'])) {
-            $act = $GLOBALS['ZPHP_CONFIG']['RESTFUL'][$act] ?? $act;
+        if (isset($GLOBALS['ZPHP_CONFIG']['ROUTER']['restfull']) && $act = strtolower($_SERVER['REQUEST_METHOD'])) {
+            $act = $GLOBALS['ZPHP_CONFIG']['ROUTER']['restfull'][$act] ?? $act;
         }
         self::$IS_MODULE && $info['module'] = array_shift($params);
         $info['ctrl'] = $params ? array_shift($params) : 'index';
@@ -620,7 +620,7 @@ class router
         $route['path'] = $params;
         $route['params'] = [];
         if ($params) {
-            if (!isset($GLOBALS['ZPHP_CONFIG']['RESTFUL']) && $params = array_chunk($params, 2)) {
+            if (!isset($GLOBALS['ZPHP_CONFIG']['ROUTER']['restfull']) && $params = array_chunk($params, 2)) {
                 foreach ($params as $v) {
                     $route['params'][$v[0]] = $v[1] ?? '';
                 }
