@@ -46,7 +46,6 @@ function AppRun($entry)
     if ($GLOBALS['ZPHP_CONFIG']['DEBUG']['level'] > 1) {
         ini_set('display_errors', 'On');
         set_error_handler('\z\debug::errorHandler');
-        ini_set('expose_php', 'Off');
     } else {
         ini_set('display_errors', 'Off');
         ini_set('expose_php', 'Off');
@@ -108,7 +107,7 @@ function TransCode($str)
     $encode = mb_detect_encoding($str, ['ASCII', 'UTF-8', 'GB2312', 'GBK', 'BIG5', 'EUC-CN']);
     return 'UTF-8' === $encode ? $str : mb_convert_encoding($str, 'UTF-8', $encode);
 }
-function make_dir($dir, $mode = 0755, $recursive = true)
+function MakeDir($dir, $mode = 0755, $recursive = true)
 {
     if (!file_exists($dir) && !mkdir($dir, $mode, $recursive)) {
         throw new Error("创建目录{$dir}失败,请检查权限");

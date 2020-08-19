@@ -217,15 +217,15 @@ class cache
     {
         $lock_path = P_CACHE . 'lock_file/';
         $lock_file = $lock_path . md5($file);
-        file_exists($lock_path) || make_dir($lock_path, 0755, true);
+        file_exists($lock_path) || MakeDir($lock_path, 0755, true);
         if (!$h = fopen($lock_file, 'w')) {
             throw new \Exception('file can not write: ' . $lock_file);
         }
         if (flock($h, LOCK_EX)) {
-            file_exists($dir = dirname($file)) || make_dir($dir, 0755, true);
+            file_exists($dir = dirname($file)) || MakeDir($dir, 0755, true);
             clearstatcache(true, $file);
             if (!is_file($file) || filemtime($file) < TIME) {
-                file_exists($dir = dirname($file)) || make_dir($dir, 0755, true);
+                file_exists($dir = dirname($file)) || MakeDir($dir, 0755, true);
                 is_callable($data) && $data = $data();
                 if (false === file_put_contents($file, $export ? "<?php\nreturn " . var_export($data, true) . ';' : serialize($data), LOCK_EX)) {
                     throw new \Exception('file can not write: ' . $file);
@@ -248,7 +248,7 @@ class cache
     }
     private static function setCacheLinux($file, $data, $export)
     {
-        file_exists($dir = dirname($file)) || make_dir($dir, 0755, true);
+        file_exists($dir = dirname($file)) || MakeDir($dir, 0755, true);
         if (!$h = fopen($file, 'w')) {
             throw new \Exception('file can not write: ' . $file);
         }
