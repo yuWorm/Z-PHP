@@ -752,14 +752,15 @@ class debug
         !$log && 2 > $level && z::_500();
         $msg = $e->getMessage();
         $trace = $e->getTraceAsString();
+        $trace = str_replace('\\\\', '\\', $trace);
         foreach ($e->getTrace() as $k=>$v) {
             $v['args'] && $args["#{$k}"] = 1 === count($v['args']) ? $v['args'][0] : $v['args'];
         }
         $args_str = isset($args) ? P($args, false) : '';
         if($log){
-            $str = '[ERROR: ' . date('H:i:s') . "] {$msg}" . PHP_EOL . $trace . PHP_EOL;
-            $args_str && $str .= str_replace("\n", PHP_EOL, $args_str) . PHP_EOL;
-            self::log($str);
+            $str = $msg . PHP_EOL . $trace . PHP_EOL;
+            $args_str && $str .=  'args: ' . str_replace("\n", PHP_EOL, $args_str);
+            self::log($str, 'error');
         }
         if($level > 1){
             header('status: 500');
@@ -769,7 +770,6 @@ class debug
                 isset($args) && $err['args'] = $args;
                 ctrl::json($err);
             }else{
-                $trace = str_replace('\\\\', '\\', $trace);
                 echo "<style>body{margin:0;padding:0;}</style><div style='background:#FFBBDD;padding:1rem;'><h2>ERROR!</h2><h3>{$msg}</h3>";
                 echo '<strong><pre>' . $trace . '</pre></strong>';
                 if (isset($args)) {
@@ -780,10 +780,11 @@ class debug
             }
         }
     }
-    private static function log($str){
-        $dir = P_TMP . '/error_log/' . APP_NAME;
+    private static function log($str, $type){
+        $dir = P_TMP . "/{$type}_log/" . APP_NAME;
         !file_exists($dir) && !mkdir($dir, 0755, true);
-        $file = $dir . '/' . date() . '.log';
+        $file = $dir . '/' . date('Y-m-d') . '.log';
+        $str = '[' . date('H:i:s') . "] {$str}";
         file_put_contents($file, $str . PHP_EOL, FILE_APPEND);
     }
     public static function setMsg($errno, $str)
@@ -796,10 +797,11 @@ class debug
         $log = $GLOBALS['ZPHP_CONFIG']['DEBUG']['log'] ?? 0;
         if($level < 3 && $log < 2) return;
         $errstr = TransCode($errstr);
-        $log > 1 && self::log('[WARNING: ' . date('H:i:s') . "] {$errstr}" . PHP_EOL);
+        $errfile = '[' . str_replace('\\', '/', $errfile) . " ] : {$errline}";
+        $log > 1 && self::log("{$errstr} {$errfile}", 'warning');
         if ($level > 2) {
             IS_AJAX || $errstr = str_replace('\\', '\\\\', $errstr);
-            self::$errs[$errno][] = "{$errstr} [" . str_replace('\\', '/', $errfile) . " ] : {$errline}";
+            self::$errs[$errno][] = "{$errstr} {$errfile}";
         }
     }
     public static function GetJsonDebug($level = null)

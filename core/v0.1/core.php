@@ -85,9 +85,9 @@ function P($var, bool $echo = true)
 {
     ob_start();
     var_dump($var);
-    $html = '<pre>' . preg_replace('/\]\=\>\n(\s+)/m', '] =>', htmlspecialchars_decode(ob_get_clean())) . '</pre>';
+    $html = preg_replace('/\]\=\>\n(\s+)/m', '] =>', htmlspecialchars_decode(ob_get_clean()));
     if ($echo) {
-        echo $html;
+        echo "<pre>{$html}</pre>";
     } else {
         return $html;
     }
