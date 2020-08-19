@@ -2,7 +2,7 @@
 return [
     'DEBUG' => [
         'level' => 3, // 输出全部debug信息
-        'type' => 'json', // 输出json格式的debug信息
+        'type' => 'auto', // debug信息的格式
     ],
     'ROUTER' => [
         'mod' => 1, // 0:queryString，1：pathInfo，2：路由
