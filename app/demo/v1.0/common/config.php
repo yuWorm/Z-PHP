@@ -7,6 +7,6 @@ return [
     'ROUTER' => [
         'mod' => 2, // 0:queryString，1：pathInfo，2：路由
         'module' => false, // 不启用模块模式
-        'restfull' => 0,
+        // 'restfull' => [], // restfull模式
     ],
 ];
