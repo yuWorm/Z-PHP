@@ -723,7 +723,9 @@ class debug
         $level = $GLOBALS['ZPHP_CONFIG']['DEBUG']['level'] ?? 3;
         $log = $GLOBALS['ZPHP_CONFIG']['DEBUG']['log'] ?? 0;
         !$log && 2 > $level && z::_500();
-        $msg = $e->getMessage();
+        $line = $e->getLine();
+        $file = $e->getFile();
+        $msg = $e->getMessage() . " at [{$file} : {$line}]";
         $trace = $e->getTraceAsString();
         $trace = str_replace('\\\\', '\\', $trace);
         foreach ($e->getTrace() as $k => $v) {
