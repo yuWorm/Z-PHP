@@ -52,9 +52,11 @@ class pdo
                 \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
             ];
             self::$Z_PDO[$key] = new \PDO($c['dsn'], $user, $pass, $config);
-            $time = microtime(true) - $mtime;
-            debug::pdotime($time);
-            debug::ErrorHandler(1120, 'connect ', $c['dsn'], round(1000 * $time, 3) . 'ms');
+            if (2 < $GLOBALS['ZPHP_CONFIG']['DEBUG']['level']) {
+                $time = microtime(true) - $mtime;
+                debug::pdotime($time);
+                debug::setMsg(1120, "CONNECT [{$c['dsn']}] : " . round(1000 * $time, 3) . 'ms');
+            }
             $this->Z_USED && in_array($key, $this->Z_USED) || $this->Z_USED[] = $key;
         }
         return self::$Z_PDO[$key];
@@ -82,7 +84,10 @@ class pdo
             default:
                 $index = (int) $i;
         }
-        if($re || !isset($this->Z_CONNECT[$index])) $this->Z_CONNECT[$index] = $this->zpdoConnect($index, $re);
+        if ($re || !isset($this->Z_CONNECT[$index])) {
+            $this->Z_CONNECT[$index] = $this->zpdoConnect($index, $re);
+        }
+
         return $this->Z_CONNECT[$index];
     }
     public function Cache($expire = null)
@@ -171,7 +176,7 @@ class pdo
         $this->Z_SQL = $sql;
         return $this->fetchResult(-1);
     }
-    public function LastId($name=null)
+    public function LastId($name = null)
     {
         return $this->Z_CONNECT[$this->Z_USEING]->lastInsertId($name);
     }
@@ -226,14 +231,14 @@ class pdo
         $path = "DB:{$db}/";
         $table && $path .= "{$table}/";
         $redis = cache::Redis();
-        if($keys = $redis->keys("{$path}*")){
+        if ($keys = $redis->keys("{$path}*")) {
             $redis->pipeline();
-            foreach($keys as $key){
+            foreach ($keys as $key) {
                 $redis->del($key);
             }
             $result = $redis->exec();
             $result && $result = array_sum($result);
-        }else{
+        } else {
             $result = 0;
         }
         return $result;
@@ -245,9 +250,9 @@ class pdo
         $preg = "#^{$path}.+$#i";
         $mem = cache::Memcached();
         $n = 0;
-        if($keys = $mem->getAllKeys()){
-            foreach($keys as $key){
-                if(preg_match($preg, $key)){
+        if ($keys = $mem->getAllKeys()) {
+            foreach ($keys as $key) {
+                if (preg_match($preg, $key)) {
                     $n += $mem->delete($key);
                 }
             }
@@ -309,9 +314,12 @@ class pdo
                         $result = $db->lastInsertId();
                         break;
                 }
-                $time = microtime(true) - $mtime;
-                debug::pdotime($time);
-                debug::ErrorHandler(1120, preg_replace('/\s/', ' ', $this->Z_SQL) . ';', trim(json_encode($bind, 320), '{}'), round(1000 * $time, 3) . 'ms');
+                if (2 < $GLOBALS['ZPHP_CONFIG']['DEBUG']['level']) {
+                    $time = microtime(true) - $mtime;
+                    debug::pdotime($time);
+                    $msg = preg_replace('/\s/', ' ', $this->Z_SQL) . '; [' . trim(json_encode($bind, 320), '{}') . '] : ' . round(1000 * $time, 3) . 'ms';
+                    debug::setMsg(1120, $msg);
+                }
             }
             return $result;
         } catch (\PDOException $e) {
@@ -329,7 +337,10 @@ class pdo
                         return $this->fetchResult($type, $fetch, $bind, 1);
                     }
                 default:
-                    debug::ErrorHandler(1120, "{$this->Z_SQL}; ", trim(json_encode($bind, 320), '{}'), 'error');
+                    if (2 < $GLOBALS['ZPHP_CONFIG']['DEBUG']['level']) {
+                        $msg = "{$this->Z_SQL}; [" . trim(json_encode($bind, 320), '{}') . '] error';
+                        debug::setMsg(1120, $msg);
+                    }
                     throw $e;
             }
         }

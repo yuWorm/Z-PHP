@@ -360,7 +360,7 @@ class router
                 $data[0] = '';
             }
             foreach ($router as $k => $v) {
-                if ('*' === $k || '/' !== $k[0]) {
+                if ('*' === $k || '/' !== $k[0] || isset($v['module'])) {
                     continue;
                 }
 
@@ -646,7 +646,7 @@ class router
         } elseif (false !== strpos($route['act'], '*') && $replace = array_shift($arr) ?: 'index') {
             $route['act'] = str_replace('*', $replace, $route['act']);
         }
-        isset($info['module']) && $route['module'] = $info['module'];
+        isset($route['module']) || isset($info['module']) && $route['module'] = $info['module'];
         if (isset($route['params'])) {
             $ii = 0;
             $n = 0;
