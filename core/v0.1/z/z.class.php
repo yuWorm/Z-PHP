@@ -590,52 +590,48 @@ class router
         } else {
             $route['ctrl'] = 'index';
         }
-        if (isset($GLOBALS['ZPHP_CONFIG']['ROUTER']['restfull'])) {
+        if (!empty($GLOBALS['ZPHP_CONFIG']['ROUTER']['restfull'])) {
             $act = strtolower($_SERVER['REQUEST_METHOD']);
             $route['act'] = $GLOBALS['ZPHP_CONFIG']['ROUTER']['restfull'][$act] ?? $act;
+        } elseif (isset($_GET['a'])) {
+            $route['act'] = $_GET['a'] ?: 'index';
+            unset($_GET['a']);
         } else {
-            if (isset($_GET['a'])) {
-                $route['act'] = $_GET['a'] ?: 'index';
-                unset($_GET['a']);
-            } else {
-                $route['act'] = 'index';
-            }
+            $route['act'] = 'index';
         }
         return $route;
     }
     private static function pathinfo2arr(string $pathinfo)
     {
         $params = $pathinfo ? explode('/', $pathinfo) : ['index'];
-        if (isset($GLOBALS['ZPHP_CONFIG']['ROUTER']['restfull']) && $act = strtolower($_SERVER['REQUEST_METHOD'])) {
-            $act = $GLOBALS['ZPHP_CONFIG']['ROUTER']['restfull'][$act] ?? $act;
-        }
         self::$IS_MODULE && $info['module'] = array_shift($params);
         $info['ctrl'] = $params ? array_shift($params) : 'index';
-        return [$info, $params];
+        if (!empty($GLOBALS['ZPHP_CONFIG']['ROUTER']['restfull']) && $act = strtolower($_SERVER['REQUEST_METHOD'])) {
+            $act = $GLOBALS['ZPHP_CONFIG']['ROUTER']['restfull'][$act] ?? $act;
+        }
+        return [$info, $params, $act ?? false];
     }
     private static function pathinfoRoute($pathinfo)
     {
-        list($route, $params) = self::pathinfo2arr($pathinfo);
-        $route['act'] = $params ? array_shift($params) : $act ?? 'index';
+        list($route, $params, $act) = self::pathinfo2arr($pathinfo);
+        $route['act'] = $act ?: ($params ? array_shift($params) : 'index');
         $route['path'] = $params;
         $route['params'] = [];
-        if ($params) {
-            if (!isset($GLOBALS['ZPHP_CONFIG']['ROUTER']['restfull']) && $params = array_chunk($params, 2)) {
-                foreach ($params as $v) {
-                    $route['params'][$v[0]] = $v[1] ?? '';
-                }
+        if ($params && $params = array_chunk($params, 2)) {
+            foreach ($params as $v) {
+                $route['params'][$v[0]] = $v[1] ?? '';
             }
         }
         return $route;
     }
     private static function route(string $pathinfo, array $router)
     {
-        list($info, $arr) = self::pathinfo2arr($pathinfo);
+        list($info, $arr, $act) = self::pathinfo2arr($pathinfo);
         if (isset($info['module']) && !$router = self::getModuleRouter($info['module'])) {
             throw new \Exception("没有{$info['module']}模块的路由");
         }
-        if (isset($arr[0]) && $route = $router["/{$info['ctrl']}/{$arr[0]}"] ?? false) {
-            array_shift($arr);
+        if ($act && isset($router["/{$info['ctrl']}/{$act}"])) {
+            $route = $router["/{$info['ctrl']}/{$act}"];
         } elseif (!$route = $router["/{$info['ctrl']}/*"] ?? $router["/{$info['ctrl']}"] ?? false) {
             if (!$route = 'index' === $info['ctrl'] && !$arr ? $router['/'] ?? false : $router['*'] ?? false) {
                 throw new \Exception('没有匹配到路由, 不想看到此错误请配置 * 路由');
