@@ -4,11 +4,11 @@ namespace z;
 class view
 {
     const
-    ENCODE_PREFIX = 'z-php-encode',
-    ENCODE_END_CHAR = '#',
+    ENCODE_PREFIX = 'z-php-encode.',
+    ENCODE_END_CHAR = '.',
     OPTIONS = LIBXML_NSCLEAN + LIBXML_PARSEHUGE + LIBXML_NOBLANKS + LIBXML_NOERROR + LIBXML_HTML_NODEFDTD + LIBXML_ERR_FATAL + LIBXML_COMPACT;
-
     private static $TAG, $PRE, $SUF, $TPL, $DISPLAY_TPL, $CACHE, $FILE, $PARAMS, $RUN, $CHANGED, $LOCK;
+    private static $REPLACE = [];
     private static function replaceEncode($html)
     {
         $i = 0;
@@ -16,36 +16,32 @@ class view
         $suf = preg_quote(self::$SUF);
         $preg0 = "/({$pre}|<\?=)([\s\S]+)({$suf}|\?>)/U";
         $preg1 = '/<\?php([\s\S]+)\?>/U';
-        $html = preg_replace_callback($preg0, function ($match) use (&$i) {
+        $html = preg_replace_callback($preg0, function ($match) {
             $code = trim($match[2]);
-            $encode = self::ENCODE_PREFIX . "{$i}=" . base64_encode("<?php echo {$code};?>") . self::ENCODE_END_CHAR;
-            ++$i;
+            $i = array_push(self::$REPLACE, "<?php echo {$code};?>") - 1;
+            $encode = self::ENCODE_PREFIX . $i . self::ENCODE_END_CHAR;
             return $encode;
         }, $html);
+
         $html = preg_replace_callback($preg1, function ($match) use (&$i) {
             $code = trim($match[1]);
-            $encode = self::ENCODE_PREFIX . "{$i}=" . base64_encode("<?php {$code}?>") . self::ENCODE_END_CHAR;
-            ++$i;
+            $i = array_push(self::$REPLACE, "<?php {$code}?>") - 1;
+            $encode = self::ENCODE_PREFIX . $i . self::ENCODE_END_CHAR;
             return $encode;
         }, $html);
         return $html;
     }
-
     private static function replaceDecode($html)
     {
         $prefix = preg_quote(self::ENCODE_PREFIX);
         $endchar = preg_quote(self::ENCODE_END_CHAR);
-        $preg1 = "/{$prefix}\d+\=([\w\/\+\=]+){$endchar}/";
-        $preg0 = "/{$prefix}\d+\=\"([\w\/\+\=]+){$endchar}\"/";
-        $html = preg_replace_callback($preg0, function ($match) {
-            return base64_decode($match[1]);
-        }, $html);
-        $html = preg_replace_callback($preg1, function ($match) {
-            return base64_decode($match[1]);
+        $preg = "/{$prefix}(\d+){$endchar}/";
+        $html = preg_replace_callback($preg, function ($match) {
+            return self::$REPLACE[$match[1]] ?? '';
         }, $html);
         return $html;
+        self::$REPLACE = [];
     }
-
     private static function getTplInfo($name)
     {
         $name = trim($name, '/');
@@ -58,7 +54,6 @@ class view
         }
         return $info;
     }
-
     public static function GetTpl(string $name, $F = false)
     {
         if (!$name) {
@@ -90,50 +85,48 @@ class view
         if (!is_file($file)) {
             throw new \Exception("file not fond: {$file}");
         }
-
         self::$FILE[$name] = $file;
         return $file;
     }
     private static function getBlock($file, $key)
     {
-            $time = filemtime($file);
-            $time > self::$CHANGED && self::$CHANGED = $time;
-            $html = self::replaceEncode(file_get_contents($file));
-            $html = '<?xml encoding="UTF-8">' . $html;
-            $dom = new \DOMDocument('1.0', 'UTF-8');
-            $dom->loadHTML($html, self::OPTIONS);
-            2 < $GLOBALS['ZPHP_CONFIG']['DEBUG']['level'] && debug::setMsg(1140, $file);
-            $nodes = $dom->getElementsByTagName(self::$TAG['template']);
-            if ($nodes->length) {
-                foreach ($nodes as $k => $v) {
-                    $name = $v->getAttribute('name');
-                    $name && self::$TPL[$key][$name] = $v;
-                }
-            } else {
-                throw new \Exception("template error: {$file}");
+        $time = filemtime($file);
+        $time > self::$CHANGED && self::$CHANGED = $time;
+        $html = self::replaceEncode(file_get_contents($file));
+        $html = '<?xml encoding="UTF-8">' . $html;
+        $dom = new \DOMDocument('1.0', 'UTF-8');
+        $dom->loadHTML($html, self::OPTIONS);
+        2 < $GLOBALS['ZPHP_CONFIG']['DEBUG']['level'] && debug::setMsg(1140, $file);
+        $nodes = $dom->getElementsByTagName(self::$TAG['template']);
+        if ($nodes->length) {
+            foreach ($nodes as $k => $v) {
+                $name = $v->getAttribute('name');
+                $name && self::$TPL[$key][$name] = $v;
             }
-            return $dom;
+        } else {
+            throw new \Exception("template error: {$file}");
+        }
+        return $dom;
     }
-    private static function setNodes($name, $key, $parent, $dom){
+    private static function setNodes($name, $key, $parent, $dom)
+    {
         if ($parent->attributes->length > 2 && $attrs = self::setAttrs($parent->attributes, $name)) {
             $node = self::$TPL[$key][$name]->cloneNode(true);
-            $setStr = implode(';', $attrs);
-            $set = $dom->createElement('php', $setStr);
-            $parent->parentNode->insertBefore($set, $parent);
-        }else{
+            $code = implode(';', $attrs) . ';?';
+            $new = $dom->createProcessingInstruction('php', $code);
+            $parent->parentNode->insertBefore($new, $parent);
+        } else {
             $node = self::$TPL[$key][$name];
         }
         $nodes = $node->childNodes;
         foreach ($nodes as $n) {
-            if (1 !== $n->nodeType || self::$TAG['import'] === $n->tagName) {
-                continue;
+            if (self::$TAG['import'] !== $n->nodeName) {
+                $new = $dom->importNode($n, true);
+                $parent->parentNode->insertBefore($new, $parent);
             }
-            $new = $dom->importNode($n, true);
-            $parent->parentNode->insertBefore($new, $parent);
         }
         $parent->parentNode->removeChild($parent);
     }
-
     private static function compressHtml($html, $compress)
     {
         switch ($compress) {
@@ -149,10 +142,10 @@ class view
         }
         return $html;
     }
-
-    private static function setAttrs($attrs, $name){
-        foreach($attrs as $attr){
-            if(':' === $attr->name[0]){
+    private static function setAttrs($attrs, $name)
+    {
+        foreach ($attrs as $attr) {
+            if (':' === $attr->name[0]) {
                 $n = ltrim($attr->name, ':');
                 $v = $attr->value ?: $n;
                 $key = '$' . $n;
@@ -179,7 +172,6 @@ class view
             }
         }
     }
-
     private static function getRun($file)
     {
         $arr = explode('/', $file);
@@ -189,7 +181,6 @@ class view
         $run[1] = explode('.', $name)[0];
         return $run;
     }
-
     public static function Fetch(string $name = '')
     {
         if (self::$DISPLAY_TPL && self::$RUN) {
@@ -228,14 +219,12 @@ class view
                 self::replacePHP($dom);
                 $html = $dom->saveHTML();
                 $html = self::replaceDecode($html);
-                $html = str_replace(['<?php }?><?php }else{?>', $flag], ['<?php }else{?>', ''], $html);
                 $html = self::compressHtml($html, $compress[0] ?? $compress);
                 if (false === file_put_contents($run_file, $html, LOCK_EX)) {
                     throw new \Exception("file can not write:{$run_file}");
                 }
             }
         }
-
         self::$PARAMS && extract(self::$PARAMS);
         self::$TPL = null;
         ob_start() && require $run_file;
@@ -251,7 +240,6 @@ class view
         }
         return $html;
     }
-
     public static function GetCache($time, $name = '', $flag = 0)
     {
         $tpl = self::GetTpl($name, true);
@@ -330,7 +318,6 @@ class view
             return ReadFileSH($file);
         }
     }
-
     private static function compressJavaScript($dom, $compress)
     {
         switch ($compress) {
@@ -352,7 +339,6 @@ class view
             }
         }
     }
-
     private static function compressCss($dom, $compress)
     {
         switch ($compress) {
@@ -374,10 +360,11 @@ class view
             }
         }
     }
-
     private static function replacePHP($dom)
     {
         $tags = $dom->getElementsByTagName(self::$TAG['php']);
+        $else = false;
+        $prev = '';
         for ($i = $tags->length - 1; 0 <= $i; --$i) {
             $t = $tags[$i];
             $parent = $t->parentNode;
@@ -385,28 +372,34 @@ class view
                 $a = $t->attributes[0];
                 switch ($a->name) {
                     case 'default':
-                        $code = '<?php default:?>';
+                        $code = 'default:?';
                         $dd = '';
                         break;
                     case 'break':
-                        $code = $t->attributes[1]->name ? "<?php {$a->name}({$a->value}){?>" : '';
-                        $dd = '<?php break;?>';
+                    case 'continue':
+                        $code = '';
+                        $dd = isset($a->value) ? "{$a->name} {$a->value};?" : "{$a->name};?";
                         break;
                     case 'case':
-                        $code = 'default' === $a->value ? '<?php default:?>' : "<?php case {$a->value}:?>";
-                        $dd = 'break' === $t->attributes[1]->name ? '<?php break;?>' : '';
+                        $code = 'default' === $a->value ? 'default:?' : "case {$a->value}:?";
+                        $dd = 'break' === $t->attributes[1]->name ? 'break;?' : '';
                         break;
                     case 'else':
-                        $code = '<?php }else{?>';
-                        $dd = '<?php }?>';
+                        $else = true;
+                        $code = '}else{?';
+                        $dd = '}?';
                         break;
                     default:
-                        $code = "<?php {$a->name}({$a->value}){?>";
-                        $dd = '<?php }?>';
+                        $code = "{$a->name}({$a->value}){?";
+                        if ($else) {
+                            $else = false;
+                            $dd = '';
+                        } else {
+                            $dd = '}?';
+                        }
                 }
                 if ($code) {
-                    $code = self::ENCODE_PREFIX . '0=' . base64_encode($code) . self::ENCODE_END_CHAR;
-                    $new = $dom->createTextNode($code);
+                    $new = $dom->createProcessingInstruction('php', $code);
                     $parent->insertBefore($new, $t);
                 }
                 foreach ($t->childNodes as $c) {
@@ -414,19 +407,16 @@ class view
                     $parent->insertBefore($new, $t);
                 }
                 if ($dd) {
-                    $dd = self::ENCODE_PREFIX . '0=' . base64_encode($dd) . self::ENCODE_END_CHAR;
-                    $str = $dom->createTextNode($dd);
-                    $parent->insertBefore($str, $t);
+                    $new = $dom->createProcessingInstruction('php', $dd);
+                    $parent->insertBefore($new, $t);
                 }
-                $parent->removeChild($t);
             } else {
-                $code = self::ENCODE_PREFIX . '0=' . base64_encode("<?php {$t->nodeValue};?>") . self::ENCODE_END_CHAR;
-                $new = $dom->createTextNode($code);
-                $parent->replaceChild($new, $t);
+                $new = $dom->createProcessingInstruction('php', "{$t->nodeValue};?");
+                $parent->insertBefore($new, $t);
             }
+            $parent->removeChild($t);
         }
     }
-
     private static function getCacheFile($flag, $run)
     {
         if (!$flag) {
@@ -445,18 +435,15 @@ class view
         }
         return [$html_path, $html_file];
     }
-
     public static function Display(string $name = '')
     {
         $html = self::Fetch($name);
         echo $html;
     }
-
     public static function Assign($key, $val)
     {
         self::$PARAMS[$key] = $val;
     }
-
     public static function GetParams()
     {
         return self::$PARAMS;
