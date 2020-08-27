@@ -35,12 +35,16 @@ class view
     {
         $prefix = preg_quote(self::ENCODE_PREFIX);
         $endchar = preg_quote(self::ENCODE_END_CHAR);
-        $preg = "/{$prefix}(\d+){$endchar}/";
-        $html = preg_replace_callback($preg, function ($match) {
+        $html = preg_replace_callback("/{$prefix}(\d+){$endchar}/", function ($match) {
             return self::$REPLACE[$match[1]] ?? '';
         }, $html);
-        return $html;
+        $html = preg_replace('/<\?php\s}\?><\?php\selse/', '<?php }else', $html);
+        $html = preg_replace_callback('/(<\?php\s}\?>){2,}/', function ($match) {
+            $len = strlen($match[0]) / 9;
+            return '<?php ' . str_repeat('}', (int) $len) . '?>';
+        }, $html);
         self::$REPLACE = [];
+        return $html;
     }
     private static function getTplInfo($name)
     {
@@ -218,6 +222,7 @@ class view
                 }
                 self::replacePHP($dom);
                 $html = $dom->saveHTML();
+                $html = str_replace($flag, '', $html);
                 $html = self::replaceDecode($html);
                 $html = self::compressHtml($html, $compress[0] ?? $compress);
                 if (false === file_put_contents($run_file, $html, LOCK_EX)) {
@@ -240,6 +245,7 @@ class view
         }
         return $html;
     }
+
     public static function GetCache($time, $name = '', $flag = 0)
     {
         $tpl = self::GetTpl($name, true);
@@ -363,8 +369,6 @@ class view
     private static function replacePHP($dom)
     {
         $tags = $dom->getElementsByTagName(self::$TAG['php']);
-        $else = false;
-        $prev = '';
         for ($i = $tags->length - 1; 0 <= $i; --$i) {
             $t = $tags[$i];
             $parent = $t->parentNode;
@@ -384,19 +388,9 @@ class view
                         $code = 'default' === $a->value ? 'default:?' : "case {$a->value}:?";
                         $dd = 'break' === $t->attributes[1]->name ? 'break;?' : '';
                         break;
-                    case 'else':
-                        $else = true;
-                        $code = '}else{?';
-                        $dd = '}?';
-                        break;
                     default:
-                        $code = "{$a->name}({$a->value}){?";
-                        if ($else) {
-                            $else = false;
-                            $dd = '';
-                        } else {
-                            $dd = '}?';
-                        }
+                        $code = $a->value ? "{$a->name}({$a->value}){?" : "{$a->name}{?";
+                        $dd = '}?';
                 }
                 if ($code) {
                     $new = $dom->createProcessingInstruction('php', $code);
