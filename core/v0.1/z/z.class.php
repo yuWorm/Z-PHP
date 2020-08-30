@@ -650,12 +650,12 @@ class router
             foreach ($route['params'] as $k => $v) {
                 if ($ii === $k) {
                     $key = $v;
-                    $value = '';
+                    $value = null;
                 } else {
                     $key = $k;
                     $value = $v;
                 }
-                $params[$key] = isset($arr[$n]) ? $arr[$n] : $value;
+                $params[$key] = $arr[$n] ?? $value;
                 ++$n && is_int($k) && ++$ii;
             }
         }
