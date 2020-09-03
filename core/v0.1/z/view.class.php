@@ -212,7 +212,7 @@ class view
             self::$CHANGED = filemtime($tpl);
             $flag = '<meta flag="ZPHP-UTF-8" http-equiv="Content-Type" content="text/html; charset=utf-8">';
             $dom = new \DOMDocument('1.0', 'UTF-8');
-            $html = $flag . self::replaceEncode(file_get_contents($tpl));
+            $html = '<!DOCTYPE html>' . $flag . self::replaceEncode(file_get_contents($tpl));
             $dom->loadHTML($html, self::OPTIONS);
             self::replaceTemplate($dom, $tpl);
             if (!$run_time || self::$CHANGED > $run_time) {

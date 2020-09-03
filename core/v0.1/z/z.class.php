@@ -363,7 +363,6 @@ class router
                 if ('*' === $k || '/' !== $k[0] || isset($v['module'])) {
                     continue;
                 }
-
                 $ctrl = $v['ctrl'] ?? 'index';
                 $act = $v['act'] ?? 'index';
                 $a = str_replace('*', '', $act);
@@ -639,7 +638,8 @@ class router
         }
         if (empty($route['ctrl']) || empty($route['act'])) {
             throw new \Exception('必须设置路由的 ctrl 和 act');
-        } elseif (false !== strpos($route['act'], '*') && $replace = array_shift($arr) ?: 'index') {
+        }
+        if (false !== strpos($route['act'], '*') && $replace = array_shift($arr) ?: 'index') {
             $route['act'] = str_replace('*', $replace, $route['act']);
         }
         isset($route['module']) || isset($info['module']) && $route['module'] = $info['module'];
@@ -650,12 +650,12 @@ class router
             foreach ($route['params'] as $k => $v) {
                 if ($ii === $k) {
                     $key = $v;
-                    $value = '';
+                    $value = null;
                 } else {
                     $key = $k;
                     $value = $v;
                 }
-                $params[$key] = isset($arr[$n]) ? $arr[$n] : $value;
+                $params[$key] = $arr[$n] ?? $value;
                 ++$n && is_int($k) && ++$ii;
             }
         }
@@ -707,7 +707,7 @@ class ctrl
 }
 class debug
 {
-    const ERRTYPE = [2 => '运行警告', 8 => '运行提醒', 256 => '错误', 512 => '警告', 1024 => '提醒', 2048 => '编码标准化警告', 1100 => '文件', 1110 => 'SQL错误', 1120 => 'SQL查询', 1130 => '环境', 1131 => '常量', 1132 => '配置', 1133 => '命名空间', 1140 => '模板文件', 1150 => '模板变量', 1160 => 'POST', 8192 => '运行通知'];
+    const ERRTYPE = [2 => '运行警告', 8 => '运行提醒', 256 => '错误', 512 => '警告', 1024 => '提醒', 2048 => '编码标准化警告', 1120 => 'SQL查询', 1130 => '环境', 1131 => '常量', 1132 => '配置', 1133 => '命名空间', 1140 => '模板文件', 1150 => '模板变量', 1160 => 'POST', 8192 => '运行通知'];
     private static $pdotime = 0;
     private static $errs = [];
     public static function pdotime($time)
