@@ -133,3 +133,84 @@ function MakeDir($dir, $mode = 0755, $recursive = true)
     }
     return true;
 }
+function Page($cfg, $return = false)
+{
+    $var = $cfg['var'] ?? 'p';
+    $data['rows'] = $cfg['rows'] ?? 0;
+    $data['num'] = ($cfg['num'] ?? 10);
+    $data['p'] = $cfg['p'] ?? (isset($_GET[$var]) ? (int) $_GET[$var] : 1);
+    if (isset($cfg['max'])) {
+        $maxRows = $data['num'] * $cfg['max'];
+        if ($maxRows < $data['rows']) {
+            $data['rows'] = $maxRows;
+            $data['p'] > $cfg['max'] && $data['p'] = $cfg['max'];
+        }
+    }
+    $start = ($data['p'] - 1) * $data['num'];
+    $data['limit'] = "{$start},{$data['num']}";
+    if (!$return) {
+        return $data['limit'];
+    }
+    $data['pages'] = $data['rows'] ? (int) ceil($data['rows'] / $data['num']) : 1;
+    switch ($data['pages'] <=> $data['p']) {
+        case -1:
+            $data['r'] = 0;
+            break;
+        case 0:
+            $data['r'] = $data['rows'] % $data['num'] ?: ($data['rows'] ? $data['num'] : 0);
+            break;
+        case 1:
+            $data['r'] = $data['num'];
+            break;
+    }
+    if (is_array($return)) {
+        $p = $data['p'];
+        $var = $cfg['var'] ?? 'p';
+        $ver = $cfg['ver'] ?? '';
+        $mod = $cfg['mod'] ?? null;
+        $nourl = $cfg['nourl'] ?? 'javascript:;';
+        $params = ROUTE['params'] ?? false;
+        $query = $_GET;
+        foreach ($return as $v) {
+            switch ($v) {
+                case 'prev':
+                    $params[$var] = $p - 1;
+                    $data['prev'] = $params[$var] && $p !== $params[$var] ? router::url([ROUTE['ctrl'], ROUTE['act']], ['params' => $params, 'query' => $query], $ver, $mod) : $nourl;
+                    break;
+                case 'next':
+                    $params[$var] = $p + 1;
+                    $data['next'] = $data['pages'] > $p ? router::url([ROUTE['ctrl'], ROUTE['act']], ['params' => $params, 'query' => $query], $ver, $mod) : $nourl;
+                    break;
+                case 'first':
+                    $params[$var] = 1;
+                    $data['first'] = 1 === $p || 1 === $data['pages'] ? $nourl : router::url([ROUTE['ctrl'], ROUTE['act']], ['params' => $params, 'query' => $query], $ver, $mod);
+                    break;
+                case 'last':
+                    $params[$var] = $data['pages'];
+                    $data['last'] = 1 === $data['pages'] || $data['pages'] === $p ? $nourl : router::url([ROUTE['ctrl'], ROUTE['act']], ['params' => $params, 'query' => $query], $ver, $mod);
+                    break;
+                case 'list':
+                    (int) $rolls = $cfg['rolls'] ?? 10;
+                    if (1 < $data['pages']) {
+                        $pos = intval($rolls / 2);
+                        if ($pos < $p && $data['pages'] > $rolls) {
+                            $i = $p - $pos;
+                            $end = $i + $rolls - 1;
+                            $end > $data['pages'] && ($end = $data['pages']) && ($i = $end - $rolls + 1);
+                        } else {
+                            $i = 1;
+                            $end = $rolls > $data['pages'] ? $data['pages'] : $rolls;
+                        }
+                        for ($i; $i <= $end; $i++) {
+                            $params[$var] = $i;
+                            $data['list'][$i] = $p == $i ? 'javascript:;' : router::url([ROUTE['ctrl'], ROUTE['act']], ['params' => $params, 'query' => $query], $ver, $mod);
+                        }
+                    } else {
+                        $data['list'] = [];
+                    }
+                    break;
+            }
+        }
+    }
+    return $data;
+}
