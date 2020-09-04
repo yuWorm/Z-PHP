@@ -2,7 +2,6 @@
 namespace ext;
 
 use z\pdo;
-use z\router;
 
 class db
 {
@@ -114,9 +113,9 @@ class db
         $this->DB_ERROR = null;
         return $this;
     }
-    public function Cache($expire = null)
+    public function Cache($expire = null, $mod = null)
     {
-        $this->PDO->Cache($expire);
+        $this->PDO->Cache($expire, $mod);
         return $this;
     }
     public function CleanCache($db, $table = '')
@@ -255,14 +254,14 @@ class db
             $field = $this->DB_field();
             $sql = "SELECT {$field} FROM ";
             if (!$lock && $cached = $this->PDO->getCached()) {
-                $this->DB_LIMIT = $this->DB_pageLimit();
+                $this->DB_LIMIT = Page($this->DB_PAGE);
                 $sqlc = $sql . $this->DB_sql();
                 $key = "{$sqlc}|2|{$fetch}" . serialize($this->DB_BIND) . serialize($this->DB_PAGE);
                 $ckey = md5($key);
                 $pkey = "{$ckey}-p";
                 $path = "{$this->DB_CONFIG['db']}/{$this->DB_CONFIG['prefix']}" . (strstr($this->DB_TABLE, ' ', true) ?: $this->DB_TABLE) . '/';
                 $result = $this->PDO->getCache($ckey, $path);
-                if (0 > $cached || false === $result || !$page = $this->PDO->getCache($pkey, $path)) {
+                if (0 > $cached[0] || false === $result || !$page = $this->PDO->getCache($pkey, $path)) {
                     $this->DB_page();
                     $sql .= $this->DB_sql(true);
                     $result = $this->PDO->setCache($ckey, function () use ($sql, $fetch) {
@@ -492,78 +491,19 @@ class db
     private function DB_page()
     {
         if (empty($this->DB_PAGE['return'])) {
-            return $this->DB_pageLimit();
+            return $this->DB_LIMIT || $this->DB_LIMIT = Page($this->DB_PAGE);
         }
-
-        $rows = (int) $this->count('', false);
-        $this->DB_PAGED['num'] = (int) $this->DB_PAGE['num'] ?? 10;
-        if ($max = empty($this->DB_PAGE['max']) ? 0 : $this->DB_PAGED['num'] * $this->DB_PAGE['max']) {
-            $rows > $max && $rows = $max;
+        $cfg = $this->DB_PAGE;
+        if (isset($cfg['max']) && !$this->DB_WHERE && !$this->DB_JOIN) {
+            $table = $this->DB_PREFIX . $this->DB_TABLE;
+            $status = $this->PDO->queryOne("show table status WHERE Name = '{$table}'");
+            $cfg['num'] ?? $cfg['num'] = 10;
+            $maxRows = $cfg['max'] * $cfg['num'];
+            $status['Rows'] > $maxRows && $cfg['rows'] = $maxRows;
         }
-        $this->DB_PAGED['rows'] = $rows;
-        $pages = $this->DB_PAGED['pages'] = $rows ? (int) ceil($rows / $this->DB_PAGED['num']) : 1;
-        $pmax = isset($this->DB_PAGE['inrange']) && !$this->DB_PAGE['inrange'] ? $max : $this->DB_PAGED['pages'];
-        $this->DB_LIMIT = $this->DB_pageLimit($pmax);
-        switch ($pages <=> $this->DB_PAGED['p']) {
-            case -1:
-                $this->DB_PAGED['r'] = 0;
-                break;
-            case 0:
-                $this->DB_PAGED['r'] = $rows % $this->DB_PAGED['num'] ?: ($rows ? $this->DB_PAGED['num'] : 0);
-                break;
-            case 1:
-                $this->DB_PAGED['r'] = $this->DB_PAGED['num'];
-                break;
-        }
-        if (is_array($this->DB_PAGE['return'])) {
-            $p = $this->DB_PAGED['p'];
-            $var = $this->DB_PAGE['var'] ?? 'p';
-            $ver = $this->DB_PAGE['ver'] ?? '';
-            $mod = $this->DB_PAGE['mod'] ?? null;
-            $nourl = $this->DB_PAGE['nourl'] ?? 'javascript:;';
-            $params = ROUTE['params'] ?? false;
-            $query = $_GET;
-            foreach ($this->DB_PAGE['return'] as $v) {
-                switch ($v) {
-                    case 'prev':
-                        $params[$var] = $p - 1;
-                        $this->DB_PAGED['prev'] = $params[$var] && $p !== $params[$var] ? router::url([ROUTE['ctrl'], ROUTE['act']], ['params' => $params, 'query' => $query], $ver, $mod) : $nourl;
-                        break;
-                    case 'next':
-                        $params[$var] = $p + 1;
-                        $this->DB_PAGED['next'] = $pages > $p ? router::url([ROUTE['ctrl'], ROUTE['act']], ['params' => $params, 'query' => $query], $ver, $mod) : $nourl;
-                        break;
-                    case 'first':
-                        $params[$var] = 1;
-                        $this->DB_PAGED['first'] = 1 === $p || 1 === $pages ? $nourl : router::url([ROUTE['ctrl'], ROUTE['act']], ['params' => $params, 'query' => $query], $ver, $mod);
-                        break;
-                    case 'last':
-                        $params[$var] = $pages;
-                        $this->DB_PAGED['last'] = 1 === $pages || $pages === $p ? $nourl : router::url([ROUTE['ctrl'], ROUTE['act']], ['params' => $params, 'query' => $query], $ver, $mod);
-                        break;
-                    case 'list':
-                        (int) $rolls = $this->DB_PAGE['rolls'] ?? 10;
-                        if (1 < $pages) {
-                            $pos = intval($rolls / 2);
-                            if ($pos < $p && $pages > $rolls) {
-                                $i = $p - $pos;
-                                $end = $i + $rolls - 1;
-                                $end > $pages && ($end = $pages) && ($i = $end - $rolls + 1);
-                            } else {
-                                $i = 1;
-                                $end = $rolls > $pages ? $pages : $rolls;
-                            }
-                            for ($i; $i <= $end; $i++) {
-                                $params[$var] = $i;
-                                $this->DB_PAGED['list'][$i] = $p == $i ? 'javascript:;' : router::url([ROUTE['ctrl'], ROUTE['act']], ['params' => $params, 'query' => $query], $ver, $mod);
-                            }
-                        } else {
-                            $this->DB_PAGED['list'] = [];
-                        }
-                        break;
-                }
-            }
-        }
+        $cfg['rows'] ?? $cfg['rows'] = $this->Count('', false);
+        $this->DB_PAGED = Page($cfg, $this->DB_PAGE['return']);
+        $this->DB_LIMIT = $this->DB_PAGED['limit'];
     }
     private function DB_done()
     {

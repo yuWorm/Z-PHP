@@ -52,7 +52,7 @@ class pdo
                 \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
             ];
             self::$Z_PDO[$key] = new \PDO($c['dsn'], $user, $pass, $config);
-            if (2 < $GLOBALS['ZPHP_CONFIG']['DEBUG']['level']) {
+            if ($GLOBALS['ZPHP_CONFIG']['DEBUG']['level']) {
                 $time = microtime(true) - $mtime;
                 debug::pdotime($time);
                 debug::setMsg(1120, "CONNECT [{$c['dsn']}] : " . round(1000 * $time, 3) . 'ms');
@@ -90,9 +90,11 @@ class pdo
 
         return $this->Z_CONNECT[$index];
     }
-    public function Cache($expire = null)
+    public function Cache($expire = null, $mod = null)
     {
-        $this->Z_CACHE = $expire ?? $this->Z_CONFIG[0]['cache_time'] ?? 600;
+        $expire ?? $expire = $this->Z_CONFIG[0]['cache_time'] ?? 600;
+        $mod ?? $mod = $this->Z_CONFIG[0]['cache_mod'] ?? 0;
+        $this->Z_CACHE = [$expire, $mod];
         return $this;
     }
     public function getCached()
@@ -101,8 +103,8 @@ class pdo
     }
     public function setCache($ckey, $data, $path = '')
     {
-        $timeout = abs($this->Z_CACHE);
-        switch ($this->Z_CONFIG[0]['cache_mod'] ?? 0) {
+        $timeout = abs($this->Z_CACHE[0]);
+        switch ($this->Z_CACHE[1]) {
             case 1:
                 $ckey = "DB:{$path}{$ckey}";
                 return cache::R($ckey, $data, $timeout, 2);
@@ -116,7 +118,7 @@ class pdo
     }
     public function getCache($ckey, $path = '')
     {
-        switch ($this->Z_CONFIG[0]['cache_mod'] ?? 0) {
+        switch ($this->Z_CACHE[1]) {
             case 1:
                 $ckey = "DB:{$path}{$ckey}";
                 return cache::R($ckey);
@@ -266,7 +268,7 @@ class pdo
         if (isset($this->Z_CACHE) && (1 === $type || 2 === $type)) {
             $ckey = md5("{$this->Z_SQL}|{$type}|{$fetch}" . serialize($bind));
             $result = $this->getCache($ckey, $path);
-            if (0 < $this->Z_CACHE && false !== $result) {
+            if (0 < $this->Z_CACHE[0] && false !== $result) {
                 $this->Z_CACHE = null;
                 return $result;
             }
@@ -314,7 +316,7 @@ class pdo
                         $result = $db->lastInsertId();
                         break;
                 }
-                if (2 < $GLOBALS['ZPHP_CONFIG']['DEBUG']['level']) {
+                if ($GLOBALS['ZPHP_CONFIG']['DEBUG']['level']) {
                     $time = microtime(true) - $mtime;
                     debug::pdotime($time);
                     $msg = preg_replace('/\s/', ' ', $this->Z_SQL) . '; [' . trim(json_encode($bind, 320), '{}') . '] : ' . round(1000 * $time, 3) . 'ms';
@@ -337,7 +339,7 @@ class pdo
                         return $this->fetchResult($type, $fetch, $bind, 1);
                     }
                 default:
-                    if (2 < $GLOBALS['ZPHP_CONFIG']['DEBUG']['level']) {
+                    if ($GLOBALS['ZPHP_CONFIG']['DEBUG']['level']) {
                         $msg = "{$this->Z_SQL}; [" . trim(json_encode($bind, 320), '{}') . '] error';
                         debug::setMsg(1120, $msg);
                     }
