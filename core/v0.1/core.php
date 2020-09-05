@@ -146,12 +146,14 @@ function Page($cfg, $return = false)
             $data['p'] > $cfg['max'] && $data['p'] = $cfg['max'];
         }
     }
+    $data['pages'] = $data['rows'] ? (int) ceil($data['rows'] / $data['num']) : 1;
+    $inrange = $cfg['inrange'] ?? true;
+    $inrange && $data['pages'] < $data['p'] && $data['p'] = $data['pages'];
     $start = ($data['p'] - 1) * $data['num'];
     $data['limit'] = "{$start},{$data['num']}";
     if (!$return) {
         return $data['limit'];
     }
-    $data['pages'] = $data['rows'] ? (int) ceil($data['rows'] / $data['num']) : 1;
     switch ($data['pages'] <=> $data['p']) {
         case -1:
             $data['r'] = 0;
