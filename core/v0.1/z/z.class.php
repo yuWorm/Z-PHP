@@ -631,6 +631,9 @@ class router
         }
         if ($act && isset($router["/{$info['ctrl']}/{$act}"])) {
             $route = $router["/{$info['ctrl']}/{$act}"];
+        } elseif(isset($router["/{$info['ctrl']}/{$arr[0]}"])) {
+            $act = array_shift($arr);
+            $route = $router["/{$info['ctrl']}/{$act}"];
         } elseif (!$route = $router["/{$info['ctrl']}/*"] ?? $router["/{$info['ctrl']}"] ?? false) {
             if (!$route = 'index' === $info['ctrl'] && !$arr ? $router['/'] ?? false : $router['*'] ?? false) {
                 throw new \Exception('没有匹配到路由, 不想看到此错误请配置 * 路由');
