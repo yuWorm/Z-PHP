@@ -204,6 +204,7 @@ class db
         if (isset($this->DB_PAGE)) {
             $this->DB_page();
             if (!$this->DB_PAGED['r']) {
+                $this->DB_done();
                 return new class
 
                 {
