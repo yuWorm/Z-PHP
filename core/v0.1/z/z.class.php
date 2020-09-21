@@ -631,7 +631,7 @@ class router
         }
         if ($act && isset($router["/{$info['ctrl']}/{$act}"])) {
             $route = $router["/{$info['ctrl']}/{$act}"];
-        } elseif(isset($router["/{$info['ctrl']}/{$arr[0]}"])) {
+        } elseif(isset($arr[0]) && isset($router["/{$info['ctrl']}/{$arr[0]}"])) {
             $act = array_shift($arr);
             $route = $router["/{$info['ctrl']}/{$act}"];
         } elseif (!$route = $router["/{$info['ctrl']}/*"] ?? $router["/{$info['ctrl']}"] ?? false) {
