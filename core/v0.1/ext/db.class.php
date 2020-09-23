@@ -472,13 +472,18 @@ class db
     }
     private function DB_getBase()
     {
-        $ver_base = P_APP_VER . "base/{$this->DB_CONFIG['db']}.base.php";
-        $app_base = P_APP . "{$this->DB_CONFIG['db']}.base.php";
-        $root_base = P_ROOT . "base/{$this->DB_CONFIG['db']}.base.php";
-        $this->DB_BASE = is_file($ver_base) && is_array($base = require $ver_base) ? $base : [];
-        is_file($app_base) && is_array($base = require $app_base) && $this->DB_BASE += $base;
-        is_file($root_base) && is_array($base = require $root_base) && $this->DB_BASE += $base;
-        defined('P_MODULE') && is_file($file = P_MODULE . "base/base.php") && is_array($base = require $file) && $this->DB_BASE = $base + $this->DB_BASE;
+        if (empty($this->DB_CONFIG['base'])) {
+            $ver_base = P_APP_VER . "base/{$this->DB_CONFIG['db']}.base.php";
+            $app_base = P_APP . "{$this->DB_CONFIG['db']}.base.php";
+            $root_base = P_ROOT . "base/{$this->DB_CONFIG['db']}.base.php";
+            $this->DB_BASE = is_file($ver_base) && is_array($base = require $ver_base) ? $base : [];
+            is_file($app_base) && is_array($base = require $app_base) && $this->DB_BASE += $base;
+            is_file($root_base) && is_array($base = require $root_base) && $this->DB_BASE += $base;
+            defined('P_MODULE') && is_file($file = P_MODULE . "base/base.php") && is_array($base = require $file) && $this->DB_BASE = $base + $this->DB_BASE;
+        } else {
+            $base = P_ROOT . ltrim($this->DB_CONFIG['base']);
+            is_file($base) && is_array($base = require $base) && $this->DB_BASE = $base;
+        }
     }
     private function DB_pageLimit($pmax = 0)
     {
