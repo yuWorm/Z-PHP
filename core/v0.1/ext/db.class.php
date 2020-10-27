@@ -446,8 +446,8 @@ class db
     public function GetWhereByKey($key, $where = [])
     {
         if ($where || $where = $this->DB_WHERE) {
-            $preg0 = "/cid`?\s*=\s*([^\s]+)/";
-            $preg1 = "/cid`?\sIN\s*\(([^\)]+)\)/i";
+            $preg0 = "/{$key}`?\s*=\s*([^\s]+)/";
+            $preg1 = "/{$key}`?\sIN\s*\(([^\)]+)\)/i";
             foreach ($where as $w) {
                 if (is_array($w[0])) {
                     $val = $w[0][$key] ?? $w[0]["{$key} in"] ?? $w[0]["{$key} IN"] ?? null;

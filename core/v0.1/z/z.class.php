@@ -724,7 +724,7 @@ class debug
         !$log && 2 > $level && z::_500();
         $line = $e->getLine();
         $file = $e->getFile();
-        $msg = $e->getMessage() . " at [{$file} : {$line}]";
+        $msg = TransCode($e->getMessage()) . " at [{$file} : {$line}]";
         $trace = $e->getTraceAsString();
         $trace = str_replace('\\\\', '\\', $trace);
         foreach ($e->getTrace() as $k => $v) {
