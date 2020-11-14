@@ -6,7 +6,7 @@ function AppRun($entry)
 {
     define('ZPHP_VER', '4.1.0');
     error_reporting(E_ALL);
-    $core = str_replace('\\', '/', dirname(__FILE__));
+    $core = str_replace('\\', '/', __DIR__);
     $p = explode('/', $core);
     'core' === array_pop($p) || array_pop($p);
     $php = explode('/', trim($_SERVER['SCRIPT_NAME'], '/'));
