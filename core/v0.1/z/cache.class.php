@@ -155,7 +155,7 @@ class cache
                 $mem->delete($lock_key);
                 $result = $r ? $data : false;
             } else {
-                $i = ceil(self::TRY_MAXTIME / self::TRY_USLEEP);
+                $i = ceil(1000 * self::TRY_EXPIRE / self::TRY_USLEEP);
                 do {
                     usleep(self::TRY_USLEEP);
                     $result = $mem->get($key);
