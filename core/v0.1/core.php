@@ -6,7 +6,7 @@ function AppRun($entry)
 {
     define('ZPHP_VER', '4.1.0');
     error_reporting(E_ALL);
-    $core = str_replace('\\', '/', dirname(__FILE__));
+    $core = str_replace('\\', '/', __DIR__);
     $p = explode('/', $core);
     'core' === array_pop($p) || array_pop($p);
     $php = explode('/', trim($_SERVER['SCRIPT_NAME'], '/'));
@@ -139,6 +139,7 @@ function Page($cfg, $return = false)
     $data['rows'] = $cfg['rows'] ?? 0;
     $data['num'] = ($cfg['num'] ?? 10);
     $data['p'] = $cfg['p'] ?? (isset($_GET[$var]) ? (int) $_GET[$var] : 1);
+    $data['p'] || $data['p'] = 1;
     if (isset($cfg['max'])) {
         $maxRows = $data['num'] * $cfg['max'];
         if ($maxRows < $data['rows']) {

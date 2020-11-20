@@ -291,7 +291,7 @@ class db
         return $result;
     }
 
-    public function Update($data)
+    public function Update($data, $call = true)
     {
         $table = $this->DB_table();
         $where = $this->DB_WHERE ? $this->DB_sqlWhere() : '';
@@ -302,7 +302,7 @@ class db
 
         $sql = "UPDATE {$table}{$join} SET {$sql}{$where}";
         $result = $this->PDO->SetSql($sql)->fetchResult(3, null, $this->DB_BIND);
-        $result && $this->DB_call('update', ['result' => $result, 'where' => $this->DB_WHERE, 'data' => $data, 'sql' => $sql, 'bind' => $this->DB_BIND]);
+        $call && $result && $this->DB_call('update', ['result' => $result, 'where' => $this->DB_WHERE, 'data' => $data, 'sql' => $sql, 'bind' => $this->DB_BIND]);
         $this->DB_done();
         return $result;
     }
@@ -320,7 +320,7 @@ class db
             }
         }
     }
-    public function Delete($alias = '')
+    public function Delete($alias = '', $call = true)
     {
         $alias && $alias = " {$alias}";
         $table = $this->DB_table();
@@ -328,12 +328,12 @@ class db
         $join = $this->DB_JOIN ? $this->DB_sqlJoin() : '';
         $sql = "DELETE{$alias} FROM {$table}{$join}{$where}";
         $result = $this->PDO->SetSql($sql)->fetchResult(3, null, $this->DB_BIND);
-        $result && $this->DB_call('delete', ['result' => $result, 'where' => $this->DB_WHERE, 'sql' => $sql, 'bind' => $this->DB_BIND]);
+        $call && $result && $this->DB_call('delete', ['result' => $result, 'where' => $this->DB_WHERE, 'sql' => $sql, 'bind' => $this->DB_BIND]);
         $this->DB_done();
         return $result;
     }
 
-    public function Insert($data, $ignore = false)
+    public function Insert($data, $ignore = false, $call = true)
     {
         //$ignore=true:主键重复则不执行
         $table = $this->DB_table();
@@ -352,7 +352,7 @@ class db
             } else {
                 $result = $this->PDO->LastId() ?: true;
             }
-            $this->DB_call('insert', ['result' => $result, 'data' => $data, 'sql' => $sql, 'bind' => $this->DB_BIND]);
+            $call && $this->DB_call('insert', ['result' => $result, 'data' => $data, 'sql' => $sql, 'bind' => $this->DB_BIND]);
         }
         $this->DB_done();
         return $result;
@@ -381,7 +381,7 @@ class db
         return $i;
     }
 
-    public function IfUpdate($insert, $update = null)
+    public function IfUpdate($insert, $update = null, $call = true)
     {
         $table = $this->DB_table();
         $update || $update = $insert;
@@ -401,7 +401,7 @@ class db
                 $result = 0;
                 break;
         }
-        $result && $this->DB_call('ifupdate', ['result' => $result, 'insert' => $insert, 'update' => $update, 'sql' => $sql, 'bind' => $this->DB_BIND]);
+        $call && $result && $this->DB_call('ifupdate', ['result' => $result, 'insert' => $insert, 'update' => $update, 'sql' => $sql, 'bind' => $this->DB_BIND]);
         $this->DB_done();
         return $result;
     }
@@ -443,28 +443,27 @@ class db
         $done && $this->DB_done();
         return $result;
     }
-    public function GetWhereByKey($key, $op = '=', $where = [])
+    public function GetWhereByKey($key, $where = [])
     {
         if ($where || $where = $this->DB_WHERE) {
-            $preg = "/{$key}`?\s*{$op}\s*\(?(\w+)\)?/";
+            $preg0 = "/{$key}`?\s*=\s*([^\s]+)/";
+            $preg1 = "/{$key}`?\sIN\s*\(([^\)]+)\)/i";
             foreach ($where as $w) {
                 if (is_array($w[0])) {
-                    $val = $w[0][$key] ?? $w[0]["{$key} {$op}"] ?? $w[0]["{$key}{$op}"] ?? null;
+                    $val = $w[0][$key] ?? $w[0]["{$key} in"] ?? $w[0]["{$key} IN"] ?? null;
                     if (isset($val)) {
                         break;
                     }
-                } elseif (preg_match($preg, $w[0], $match)) {
-                    if (isset($match[1])) {
-                        if (strpos($match[1], ',')) {
-                            $binds = explode(',', $match[1]);
-                            foreach ($binds as $a) {
-                                isset($w[1][$a]) && $val[] = $w[1][$a];
-                            }
-                        } else {
-                            $val = $match[1];
-                        }
-                    }
+                } elseif (preg_match($preg0, $w[0], $match) && isset($match[1])) {
+                    $val = trim($match[1], "'\"");
                     break;
+                } elseif (preg_match($preg1, $w[0], $match)) {
+                    if (isset($match[1]) && $arr = explode(',', $match[1])) {
+                        foreach ($arr as $v) {
+                            $val[] = trim($v, " '\"");
+                        }
+                        break;
+                    }
                 }
             }
         }
@@ -472,13 +471,18 @@ class db
     }
     private function DB_getBase()
     {
-        $ver_base = P_APP_VER . "base/{$this->DB_CONFIG['db']}.base.php";
-        $app_base = P_APP . "{$this->DB_CONFIG['db']}.base.php";
-        $root_base = P_ROOT . "base/{$this->DB_CONFIG['db']}.base.php";
-        $this->DB_BASE = is_file($ver_base) && is_array($base = require $ver_base) ? $base : [];
-        is_file($app_base) && is_array($base = require $app_base) && $this->DB_BASE += $base;
-        is_file($root_base) && is_array($base = require $root_base) && $this->DB_BASE += $base;
-        defined('P_MODULE') && is_file($file = P_MODULE . "base/base.php") && is_array($base = require $file) && $this->DB_BASE = $base + $this->DB_BASE;
+        if (empty($this->DB_CONFIG['base'])) {
+            $ver_base = P_APP_VER . "base/{$this->DB_CONFIG['db']}.base.php";
+            $app_base = P_APP . "{$this->DB_CONFIG['db']}.base.php";
+            $root_base = P_ROOT . "base/{$this->DB_CONFIG['db']}.base.php";
+            $this->DB_BASE = is_file($ver_base) && is_array($base = require $ver_base) ? $base : [];
+            is_file($app_base) && is_array($base = require $app_base) && $this->DB_BASE += $base;
+            is_file($root_base) && is_array($base = require $root_base) && $this->DB_BASE += $base;
+            defined('P_MODULE') && is_file($file = P_MODULE . "base/base.php") && is_array($base = require $file) && $this->DB_BASE = $base + $this->DB_BASE;
+        } else {
+            $base = IsFullPath($this->DB_CONFIG['base']) ? $this->DB_CONFIG['base'] : P_ROOT . ltrim($this->DB_CONFIG['base']);
+            is_file($base) && is_array($base = require $base) && $this->DB_BASE = $base;
+        }
     }
     private function DB_pageLimit($pmax = 0)
     {

@@ -6,6 +6,8 @@ class cache
     const LOCK_EXPIRE = 30; // 获取缓存锁的超时时间(秒)
     const LOCK_SLEEP = 1000; // 获取缓存锁的重试间隔(微秒)
     const LOCK_KEY_PREFIX = 'z-php-lock:'; // 缓存锁的键名前缀
+    const TRY_USLEEP = 2000; // 尝试读取缓存的间隔(微秒)
+    const TRY_EXPIRE = 30000; // 尝试读取缓存的超时时间(毫秒)
     private static $Z_REDIS, $Z_MEMCACHED;
     public static function Redis(array $c = null, bool $new = false)
     {
@@ -114,8 +116,13 @@ class cache
                 $redis->del($lock_key);
                 $result = $r ? $data : false;
             } else {
-                $result = $redis->get($key);
+                $i = ceil(1000 * self::TRY_EXPIRE / self::TRY_USLEEP);
+                do {
+                    usleep(self::TRY_USLEEP);
+                    $result = $redis->get($key);
+                } while (false === $result && --$i);
                 $result && $result = unserialize($result);
+                return $result;
             }
         } else {
             is_callable($data) && $data = $data() ?: '';
@@ -148,8 +155,13 @@ class cache
                 $mem->delete($lock_key);
                 $result = $r ? $data : false;
             } else {
-                $result = $mem->get($key);
+                $i = ceil(1000 * self::TRY_EXPIRE / self::TRY_USLEEP);
+                do {
+                    usleep(self::TRY_USLEEP);
+                    $result = $mem->get($key);
+                } while (false === $result && --$i);
                 $result && $result = unserialize($result);
+                return $result;
             }
         } else {
             is_callable($data) && $data = $data() ?: '';
