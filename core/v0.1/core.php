@@ -139,6 +139,7 @@ function Page($cfg, $return = false)
     $data['rows'] = $cfg['rows'] ?? 0;
     $data['num'] = ($cfg['num'] ?? 10);
     $data['p'] = $cfg['p'] ?? (isset($_GET[$var]) ? (int) $_GET[$var] : 1);
+    $data['p'] || $data['p'] = 1;
     if (isset($cfg['max'])) {
         $maxRows = $data['num'] * $cfg['max'];
         if ($maxRows < $data['rows']) {
