@@ -720,7 +720,7 @@ class debug
     {
         $level = $GLOBALS['ZPHP_CONFIG']['DEBUG']['level'] ?? 3;
         $log = $GLOBALS['ZPHP_CONFIG']['DEBUG']['log'] ?? 0;
-        !$log && 2 > $level && z::_500();
+        !$log && 2 > $level && ctrl::_500();
         $line = $e->getLine();
         $file = $e->getFile();
         $msg = TransCode($e->getMessage()) . " at [{$file} : {$line}]";
@@ -793,10 +793,7 @@ class debug
             ];
         }
         if (2 < $level) {
-            is_file($file = $GLOBALS['ZPHP_MAPPING']['libs'] . 'view.class.php')
-            && (require $file)
-            && !class_exists('\libs\view', false)
-            && ($params = \libs\view::GetParams())
+            ($params = view::GetParams())
             && self::$errs[1150] = $params;
             $json['文件'] = get_included_files();
             $json['环境'] = $_SERVER;

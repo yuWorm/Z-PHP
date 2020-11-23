@@ -133,6 +133,26 @@ function MakeDir($dir, $mode = 0755, $recursive = true)
     }
     return true;
 }
+function DelDir($dir, $rmdir = false, $i = 0)
+{
+    if (file_exists($dir) && $h = opendir($dir)) {
+        while (false !== ($item = readdir($h))) {
+            if ('.' !== $item && '..' !== $item) {
+                if (is_dir($dir . '/' . $item)) {
+                    $i += DelDir($dir . '/' . $item, $rmdir);
+                } elseif (unlink($dir . '/' . $item)) {
+                    ++$i;
+                }
+            }
+        }
+        closedir($h);
+    } else {
+        return false;
+    }
+
+    $rmdir && rmdir($dir) && ++$i;
+    return $i;
+}
 function Page($cfg, $return = false)
 {
     $var = $cfg['var'] ?? 'p';
