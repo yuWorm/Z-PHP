@@ -321,7 +321,7 @@ class view
                         }
                     }
             }
-            return ReadFileSH($file);
+            return ReadFileSH($cache[1]);
         }
     }
     private static function compressJavaScript($dom, $compress)

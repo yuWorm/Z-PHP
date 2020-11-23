@@ -226,7 +226,7 @@ class pdo
     {
         $path = P_CACHE . "DB_{$db}";
         $table && $path .= "/{$table}";
-        return del_dir($path, true);
+        return DelDir($path, true);
     }
     private function cleanCache1($db, $table)
     {
